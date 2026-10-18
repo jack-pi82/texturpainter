@@ -215,7 +215,8 @@ WHERE THE IMAGES ARE
 --------------------
 Blender file saved:      next to the .blend in the folder  <name>_texturpainter
                          - the PSD files
-                         - "templates" and "..._views" = copies of the templates
+                         - "..._templates", "templates" = copies of the templates
+                         - "..._views" = views with their camera data
                          - "..._backup.npz" = texture before the round
 Not saved yet:           in Blender's temp folder, moves next to the .blend
                          on the first save

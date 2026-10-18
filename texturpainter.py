@@ -4,7 +4,7 @@
 bl_info = {
     "name": "Texturpainter - paint 3D models in your 2D painting app",
     "author": "jack-pi82",
-    "version": (1, 3, 0),
+    "version": (1, 3, 1),
     "blender": (4, 2, 0),
     "location": "3D Viewport > Sidebar (N) > Texturpainter",
     "description": "Send the view to CSP/Krita/PhotoCraft, paint there, projected back onto the model live",
@@ -610,9 +610,23 @@ def load_backup(state):
     if "backup" in rt:
         return
     path = trusted_png_path(state)
-    if path and os.path.isfile(backup_path(path)):
-        with np.load(backup_path(path)) as stored:
-            rt["backup"] = {key: stored[key] for key in stored.files}
+    if not path or not os.path.isfile(backup_path(path)):
+        return
+    data = {}
+    try:
+        if os.path.getsize(backup_path(path)) > 2 * 1024 ** 3:
+            return
+        with np.load(backup_path(path), allow_pickle=False) as stored:
+            for key in stored.files:
+                img = bpy.data.images.get(key)
+                if img is None:
+                    continue
+                arr = stored[key]
+                if arr.dtype in (np.float16, np.float32) and arr.size == img.size[0] * img.size[1] * 4:
+                    data[key] = arr
+    except (OSError, ValueError, zlib.error):
+        return  # kaputte Sicherung: dann eben ohne
+    rt["backup"] = data
 
 
 def move_capture_next_to_blend(state, blend_path):
@@ -629,8 +643,9 @@ def move_capture_next_to_blend(state, blend_path):
         if os.path.isfile(src):
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
-    if os.path.isdir(tiles_dir_for(old)):
-        shutil.copytree(tiles_dir_for(old), tiles_dir_for(new), dirs_exist_ok=True)
+    for dir_for in (tiles_dir_for, compare_dir_for):
+        if os.path.isdir(dir_for(old)):
+            shutil.copytree(dir_for(old), dir_for(new), dirs_exist_ok=True)
     for name in [n for n in state.image_names.split("\n") if n]:
         img = bpy.data.images.get(name)
         if img is None or not img.filepath_raw:
@@ -708,9 +723,11 @@ def capture_single(context, prefs, state, obj, area, region, space):
         img = capture_image(context, area, region, size)
     remove_images([f"Texturpainter View {clean}"])
     img.name = f"Texturpainter View {clean}"
+    os.makedirs(tiles_dir_for(path), exist_ok=True)
+    save_png(img, os.path.join(tiles_dir_for(path), "view.png"))
     template_file = template_path(path)
     os.makedirs(os.path.dirname(template_file), exist_ok=True)
-    save_png(img, template_file)
+    shutil.copy2(os.path.join(tiles_dir_for(path), "view.png"), template_file)
     rgba = to_rgba8(img)
     psd_write(path, img.size[0], img.size[1], view_layers(rgba), rgba)
 
@@ -736,8 +753,16 @@ def world_vertices(context, obj):
 
 
 def tiles_dir_for(png_path):
+    """Bilder der Ansichten. Auf diese Dateien zeigen die Blender-Bilder (mit View-Matrizen)."""
     base = os.path.splitext(os.path.basename(png_path))[0]
     return os.path.join(os.path.dirname(png_path), base + "_views")
+
+
+def compare_dir_for(png_path):
+    """Unveränderte Kopien der Vorlagen zum Vergleichen. Kein Blender-Bild zeigt hierhin,
+    damit sie nie versehentlich mit Gemaltem überschrieben werden."""
+    base = os.path.splitext(os.path.basename(png_path))[0]
+    return os.path.join(os.path.dirname(png_path), base + "_templates")
 
 
 def capture_grid(context, prefs, state, obj, area, region, space, rv3d):
@@ -784,6 +809,8 @@ def capture_grid(context, prefs, state, obj, area, region, space, rv3d):
                 remove_images([name])
                 img.name = name
                 save_png(img, os.path.join(tiles_dir, f"{key}.png"))
+                os.makedirs(compare_dir_for(path), exist_ok=True)
+                shutil.copy2(os.path.join(tiles_dir, f"{key}.png"), os.path.join(compare_dir_for(path), f"{key}.png"))
                 tiles.append(img)
     finally:
         rv3d.view_rotation, rv3d.view_location, rv3d.view_distance, rv3d.view_perspective = saved_view
@@ -933,7 +960,8 @@ def _psd_channel(data, comp, h, w):
     elif comp == 1:
         raw = _unpackbits(data[2 * h:], size)  # Zeilenlängen überspringen
     elif comp in (2, 3):
-        raw = zlib.decompress(data)[:size]
+        raw = zlib.decompressobj().decompress(data, size)  # nie mehr als die Ebene groß ist
+        raw += b"\0" * (size - len(raw))
     else:
         raise CSPError(rpt_("Unsupported PSD compression ({}).").format(comp))
     arr = np.frombuffer(raw, dtype=np.uint8).reshape(h, w)
@@ -942,8 +970,18 @@ def _psd_channel(data, comp, h, w):
     return arr
 
 
+PSD_MAX_SIDE = 16384
+
+
 def psd_read(path):
-    """Gibt (Breite, Höhe, Ebenen von unten nach oben) zurück."""
+    """Gibt (Breite, Höhe, Ebenen von unten nach oben) zurück. Kaputte Dateien -> CSPError."""
+    try:
+        return _psd_read(path)
+    except (struct.error, IndexError, ValueError, zlib.error, MemoryError) as ex:
+        raise CSPError(rpt_("The file is not a PSD file. Please save as PSD.") + f" ({ex})")
+
+
+def _psd_read(path):
     with open(path, "rb") as f:
         data = f.read()
     if data[:4] != b"8BPS" or struct.unpack(">H", data[4:6])[0] != 1:
@@ -951,6 +989,8 @@ def psd_read(path):
     _nch, height, width, depth, mode = struct.unpack(">HIIHH", data[12:26])
     if depth != 8 or mode != 3:
         raise CSPError(rpt_("Only 8-bit RGB PSD files are supported."))
+    if not (0 < width <= PSD_MAX_SIDE and 0 < height <= PSD_MAX_SIDE):
+        raise CSPError(rpt_("The file is not a PSD file. Please save as PSD."))
     pos = 26
     for _ in range(2):  # Farbmodus-Daten, Bild-Ressourcen
         pos += 4 + struct.unpack(">I", data[pos:pos + 4])[0]
@@ -1002,6 +1042,8 @@ def psd_read(path):
     for layer in records:
         t, l, b, r = layer._rect
         h, w = b - t, r - l
+        if not (0 <= h <= height and 0 <= w <= width):
+            h = w = 0  # Ebene größer als die Leinwand: Pixel nicht auspacken
         planes = {}
         for cid, clen in layer._channels:
             comp = struct.unpack(">H", data[pos:pos + 2])[0]
@@ -1153,6 +1195,9 @@ def apply_pending(op, context, prefs, state, area, region, final=True):
     else:
         path = trusted_png_path(state)
         tw, th = state.tile_w, state.tile_h
+        if not (16 <= tw <= PSD_MAX_SIDE and 16 <= th <= PSD_MAX_SIDE):
+            forget_capture(state)
+            raise CSPError(rpt_("The capture data is missing in Blender. Please capture again."))
         width, height, layers = psd_read(path)
         if (width, height) != (tw, th):
             raise CSPError(rpt_("The image has the wrong size ({} x {} instead of {} x {}). "
@@ -1175,8 +1220,12 @@ def apply_pending(op, context, prefs, state, area, region, final=True):
             if not leaves:
                 continue
             key = name.rsplit(" ", 1)[-1]
-            template_file = os.path.join(tiles_dir, f"{key}.png")
-            template = load_png_pixels(template_file)[::-1] if os.path.isfile(template_file) else None
+            template = None
+            if key in VIEW_ROTATIONS:  # nur feste Ansichtsnamen, nie frei aus dem Bildnamen
+                compare_dir = compare_dir_for(path)
+                template_file = os.path.join(compare_dir if os.path.isdir(compare_dir) else tiles_dir, f"{key}.png")
+                if os.path.isfile(template_file):
+                    template = load_png_pixels(template_file)[::-1]
             part = compose_view(leaves, width, height, template)
             if float(part[..., 3].max()) < 0.004:
                 continue  # in diesem Ordner wurde nichts gemalt
@@ -1397,7 +1446,7 @@ def live_update(window, scene):
         rt.pop("live_error", None)
     except CSPError as ex:
         runtime(state)["live_error"] = str(ex)
-    except (RuntimeError, ValueError, OSError) as ex:
+    except Exception as ex:  # eine kaputte Datei darf das Live-Update nie stoppen
         runtime(state)["live_error"] = rpt_("Live update failed: {}").format(ex)
 
 
@@ -1415,7 +1464,7 @@ def _redraw_timer():
             for area in window.screen.areas:
                 if area.type == "VIEW_3D":
                     area.tag_redraw()
-    except (AttributeError, ReferenceError):
+    except Exception:  # der Timer muss weiterlaufen, egal was passiert
         pass
     return 1.0
 

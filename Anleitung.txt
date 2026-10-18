@@ -217,7 +217,8 @@ WO DIE BILDER LIEGEN
 --------------------
 Blender-Datei gespeichert:  neben der .blend im Ordner  <name>_texturpainter
                             - die PSD-Dateien
-                            - "templates" und "..._views" = Kopien der Vorlagen
+                            - "..._templates", "templates" = Kopien der Vorlagen
+                            - "..._views" = Ansichten mit Blickwinkel-Daten
                             - "..._backup.npz" = Textur vor der Runde
 Noch nicht gespeichert:     im Blender-Temp-Ordner, zieht beim ersten
                             Speichern neben die .blend um
