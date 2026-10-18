@@ -22,7 +22,7 @@ All buttons are in the 3D Viewport sidebar (N), tab **Texturpainter**. Instead o
 | Button | What it does |
 | --- | --- |
 | **Clip Studio Paint** (dropdown) | Picks the painting program: Clip Studio Paint, Krita, PhotoCraft or Custom program |
-| **All-sides mode: off** / **ON** | Off: sends the view you see. On: sends all sides at once as one grid image |
+| **All-sides mode: off** / **ON** | Off: sends the view you see. On: sends all sides at once, one folder per view |
 | **View to CSP** | Sends the current view to the painting program. Shown when no view is open |
 | **New view to CSP** | Same button while a view is open: finishes it and sends the new view |
 | **All sides to CSP** | Same button with all-sides mode on |
@@ -32,23 +32,26 @@ All buttons are in the 3D Viewport sidebar (N), tab **Texturpainter**. Instead o
 
 ## Usage
 
-1. Select the model and press **View to CSP**. The painting program opens with the current view.
-2. In the painting program, create a new layer and paint. The template may stay visible.
+Tip: save your .blend once before you start, so all images live next to it.
+
+1. Select the model and press **View to CSP**. The painting program opens a PSD with two layers: **paint** on top, **Template** below.
+2. Click the **paint** layer and paint. You may lower its opacity to see the shading; Blender always projects the colour at full opacity.
 3. Press Ctrl+S as often as you like. After every save the painting appears on the model by itself after about a second.
 4. For the next side, rotate the model in Blender and press **New view to CSP**.
-5. At the end press **Save Blender file**.
+5. At the end press **Save Blender file**. Later you can open the .blend and the PSD again and simply keep painting.
 
-With **All-sides mode: ON**, the button **All sides to CSP** sends 6, 8 or 10 views as one grid image, so one Ctrl+S covers every side.
+With **All-sides mode: ON**, the button **All sides to CSP** sends one PSD with a folder per view (6, 8 or 10, default 10), each with **paint** and **Template**. Show one folder at a time, click its **paint** layer and paint. Blender reads every folder, hidden ones too.
 
 The full guide with troubleshooting is in [Guide.txt](Guide.txt).
 
 ## How it works
 
 - **Capture:** The view is captured with `paint.image_from_view`. Blender stores the view matrices in the image, as *Quick Edit* does.
-- **Template:** A copy of the template is kept in `templates/`. When projecting, every pixel that is unchanged compared to the template becomes transparent, so only new paint is projected.
+- **PSD:** The add-on writes and reads layered 8-bit RGB PSD files itself (raw, RLE and ZIP channels), so no extra libraries are needed.
+- **Template:** A copy of each template is kept as PNG. Only the paint layers are projected, and paint applied directly on a template layer is detected by comparing it with the copy. Layer opacity is ignored.
 - **Projection:** `paint.project_image` with occlusion, backface culling and normal falloff.
-- **All-sides mode:** orthographic views are combined into one grid with numpy and cut apart again when projecting.
-- **Live update:** A timer checks the PNG's modification time every second. The texture is backed up in memory at capture time and restored before every update, so saving repeatedly never paints anything twice and *Discard* can undo everything.
+- **All-sides mode:** one orthographic view per direction, each framed tightly around the model, one PSD folder each.
+- **Live update:** A timer checks the PSD's modification time every second. The texture is backed up at capture time and restored before every update, so saving repeatedly never paints anything twice and *Discard* can undo everything. The backup is written next to the .blend on save, so painting can continue after a restart.
 - **First-time setup:** Missing UVs, materials and textures are created automatically. Painted textures are packed into the .blend.
 - **Translations:** English strings in the code, German via `bpy.app.translations`.
 
@@ -82,7 +85,7 @@ Alle Knöpfe sind in der 3D-Ansicht im N-Panel, Reiter **Texturpainter**. Statt 
 | Knopf | Was er macht |
 | --- | --- |
 | **Clip Studio Paint** (Auswahlliste) | Wählt das Mal-Programm: Clip Studio Paint, Krita, PhotoCraft oder Eigenes Programm |
-| **Rundum-Modus: aus** / **AN** | Aus: schickt die Ansicht, die du siehst. An: schickt alle Seiten auf einmal als ein Raster-Bild |
+| **Rundum-Modus: aus** / **AN** | Aus: schickt die Ansicht, die du siehst. An: schickt alle Seiten auf einmal, ein Ordner pro Ansicht |
 | **Ansicht an CSP** | Schickt die aktuelle Ansicht ans Mal-Programm. Steht da, wenn keine Ansicht offen ist |
 | **Neue Ansicht an CSP** | Derselbe Knopf, solange eine Ansicht offen ist: schließt sie ab und schickt die neue |
 | **Rundum an CSP** | Derselbe Knopf bei eingeschaltetem Rundum-Modus |
@@ -92,13 +95,15 @@ Alle Knöpfe sind in der 3D-Ansicht im N-Panel, Reiter **Texturpainter**. Statt 
 
 ### Bedienung
 
-1. Modell anklicken und **Ansicht an CSP** drücken. Das Mal-Programm öffnet sich mit der aktuellen Ansicht.
-2. Im Mal-Programm eine neue Ebene anlegen und malen. Die Vorlage darf sichtbar bleiben.
+Tipp: Speicher deine .blend einmal vor dem Start, dann liegen alle Bilder gleich daneben.
+
+1. Modell anklicken und **Ansicht an CSP** drücken. Das Mal-Programm öffnet eine PSD mit zwei Ebenen: oben **malen**, darunter **Vorlage**.
+2. Die Ebene **malen** anklicken und malen. Die Deckkraft darfst du senken, um die Schattierung zu sehen; Blender klebt die Farbe immer mit voller Deckkraft auf.
 3. Strg+S drücken, so oft du willst. Nach jedem Speichern erscheint das Gemalte nach etwa einer Sekunde von selbst auf dem Modell.
 4. Für die nächste Seite in Blender das Modell drehen und **Neue Ansicht an CSP** drücken.
-5. Zum Schluss **Blender-Datei speichern** drücken.
+5. Zum Schluss **Blender-Datei speichern** drücken. Später .blend und PSD wieder öffnen und einfach weitermalen.
 
-Mit **Rundum-Modus: AN** schickt der Knopf **Rundum an CSP** 6, 8 oder 10 Ansichten als ein Raster-Bild, ein Strg+S reicht dann für alle Seiten.
+Mit **Rundum-Modus: AN** schickt der Knopf **Rundum an CSP** eine PSD mit einem Ordner pro Ansicht (6, 8 oder 10, Standard 10), jeweils mit **malen** und **Vorlage**. Immer einen Ordner einblenden, dort **malen** anklicken und malen. Blender liest alle Ordner, auch die ausgeblendeten.
 
 Die ausführliche Anleitung mit Fehlerhilfe steht in [Anleitung.txt](Anleitung.txt).
 

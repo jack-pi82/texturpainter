@@ -24,6 +24,13 @@ PhotoCraft oder ein anderes Programm: Add-on aufklappen > Pfad zur .exe
 eintragen. Liegt ein Programm woanders: dort den Pfad ändern.
 
 
+TIPP VORWEG: ERST DIE BLENDER-DATEI SPEICHERN
+---------------------------------------------
+Speicher deine .blend einmal, bevor du anfängst. Dann liegen alle Bilder
+gleich neben der .blend und du kannst jederzeit aufhören und später
+weitermachen. (Vergessen? Auch kein Drama, siehe "Später weitermalen".)
+
+
 DAS PANEL
 ---------
 3D-Ansicht > N drücken > Reiter "Texturpainter". Von oben nach unten:
@@ -48,23 +55,78 @@ Statt "CSP" steht auf den Knöpfen das gewählte Programm,
 z. B. "Ansicht an Krita".
 
 
-SO MALST DU
------------
+SO MALST DU (EINE ANSICHT)
+--------------------------
 1. Modell anklicken.
 2. "Ansicht an CSP" drücken.
-   -> Dein Mal-Programm geht mit einem Bild der Ansicht auf.
+   -> Dein Mal-Programm geht mit einer PSD-Datei auf.
       (Liegt es hinter Blender: in der Taskleiste anklicken.)
-3. Im Mal-Programm:
-   - NEUE EBENE anlegen und darauf malen
-   - Die Vorlage darf sichtbar bleiben
-   - Strg+S, so oft du willst
+3. Im Mal-Programm gibt es zwei Ebenen:
+     "malen"    oben  -> HIER malen
+     "Vorlage"  unten -> das Bild von Blender
+   Die Ebene "malen" anklicken und malen. Strg+S, so oft du willst.
    -> Nach jedem Strg+S erscheint das Gemalte nach ca. 1 Sekunde
       von selbst auf dem Modell in Blender.
 4. Andere Seite: In Blender das Modell drehen, "Neue Ansicht an CSP" drücken.
-   -> Die neue Ansicht geht ans Mal-Programm.
 5. Wiederholen.
 6. Zum Schluss: "Blender-Datei speichern".
    (Bei einer neuen Datei fragt Blender, wohin.)
+
+
+DECKKRAFT DER MAL-EBENE
+-----------------------
+Stell die Deckkraft von "malen" ruhig auf z. B. 70 %, damit du die
+Schattierung der Vorlage durch deine Farbe siehst.
+Blender klebt die Farbe trotzdem mit VOLLER Deckkraft auf. Die
+Schattierung im Modell kommt von Blenders Licht, nicht aus deinem Bild.
+
+
+RUNDUM-MODUS (ALLE SEITEN AUF EINMAL)
+-------------------------------------
+Auf "Rundum-Modus: aus" klicken, dann steht da "Rundum-Modus: AN".
+Dann "Rundum an CSP" drücken.
+
+Du bekommst EINE PSD mit einem Ordner pro Ansicht:
+
+  vorne, vorne rechts, rechts, hinten rechts, hinten,
+  hinten links, links, vorne links, oben, unten
+
+In jedem Ordner: "malen" (oben) und "Vorlage" (unten).
+Nur "vorne" ist sichtbar, die anderen sind ausgeblendet.
+
+So wechselst du die Seite:
+1. Beim Ordner, an dem du fertig bist, das Auge ausschalten.
+2. Beim nächsten Ordner das Auge einschalten und ihn aufklappen.
+3. Dort die Ebene "malen" anklicken. (Wichtig! Sonst malt das Programm
+   weiter auf der Ebene vom vorigen Ordner.)
+4. Malen, Strg+S.
+
+Blender liest beim Speichern ALLE Ordner, auch die ausgeblendeten, und
+klebt jeden aus seiner Richtung auf.
+
+WICHTIG: Die Leinwand im Mal-Programm nicht skalieren oder zuschneiden.
+
+In den Einstellungen: 6, 8 oder 10 Ansichten (Standard 10).
+
+Versteckte Stellen (Achseln, Beininnenseiten, unters Kinn) danach
+mit "Rundum-Modus: aus" gezielt nachmalen: Modell so drehen, dass man
+die Stelle sieht, "Ansicht an CSP" drücken.
+
+
+SPÄTER WEITERMALEN
+------------------
+1. "Blender-Datei speichern" drücken. In CSP Strg+S drücken.
+   Beides darf jetzt zu.
+2. Später: .blend in Blender öffnen, die PSD in CSP öffnen
+   (oder in Blender "Nochmal öffnen" drücken).
+3. Einfach weitermalen und Strg+S drücken. Blender übernimmt es wie
+   vorher, ohne etwas doppelt aufzumalen.
+
+War die .blend beim Start noch nicht gespeichert, liegt die PSD erst im
+Temp-Ordner von Blender. Beim ersten Speichern zieht sie automatisch neben
+die .blend um. Das Panel sagt dann:
+  "Das Bild liegt jetzt neben der .blend-Datei."
+  -> "Nochmal öffnen" drücken und den alten Tab im Mal-Programm schließen.
 
 
 GUT ZU WISSEN
@@ -75,22 +137,11 @@ GUT ZU WISSEN
 - "Neue Ansicht an CSP" gedrückt, ohne zu malen? Egal, es geht einfach weiter.
 - "Verwerfen" nimmt alles zurück, was du in der aktuellen Ansicht
   gemalt hast.
-- "Nochmal öffnen" = falls du das Mal-Programm zugemacht hast.
+- Aus Versehen direkt auf die "Vorlage" gemalt? Wird trotzdem erkannt.
 - Achtung: Was du direkt in Blender auf die Textur malst, während eine
   Ansicht im Mal-Programm offen ist, wird beim nächsten Strg+S im
   Mal-Programm überschrieben. Erst "Verwerfen" oder eine neue Ansicht
   holen, dann in Blender malen.
-
-
-WARUM DIE VORLAGE SICHTBAR BLEIBEN DARF
----------------------------------------
-Blender merkt sich die Vorlage. Beim Aufkleben wird alles ignoriert,
-was noch genau wie die Vorlage aussieht. Nur was du neu gemalt hast,
-landet auf dem Modell.
-
-Ausnahme: Halbdurchsichtige Pinsel (Airbrush, weiche Ränder) mischen
-sich beim Speichern mit dem Grau der Vorlage. Dann klebt etwas Grau
-mit auf. Für solche Pinsel die Vorlage kurz vor Strg+S ausblenden.
 
 
 DER STATUS IM PANEL
@@ -102,38 +153,11 @@ DER STATUS IM PANEL
   !  rote Meldung             -> Hat nicht geklappt, Grund steht da
 
 
-RUNDUM-MODUS (alle Seiten auf einmal)
--------------------------------------
-Auf "Rundum-Modus: aus" klicken, dann steht da "Rundum-Modus: AN".
-Dann "Rundum an CSP" drücken.
-Du bekommst EIN Bild mit allen Seiten nebeneinander:
-
-  oben:   vorne | rechts | hinten | links
-  unten:  oben  | unten  | (leer) | (leer)
-
-Alles bemalen, Strg+S. Blender schneidet das Bild selbst auseinander
-und klebt jede Seite aus ihrer Richtung auf.
-
-WICHTIG: Das Bild im Mal-Programm nicht skalieren oder zuschneiden.
-
-In den Einstellungen: 6, 8 oder 10 Ansichten (8 und 10 haben
-zusätzlich Schrägansichten).
-
-Versteckte Stellen (Achseln, Beininnenseiten, unters Kinn) danach
-mit "Rundum-Modus: aus" gezielt nachmalen: Modell so drehen, dass man
-die Stelle sieht, "Ansicht an CSP" drücken.
-
-
 MAL-PROGRAMM WECHSELN
 ---------------------
 Ganz oben im Panel: Clip Studio Paint / Krita / PhotoCraft / Eigenes.
-
-Beim Speichern mit Strg+S:
-- CSP:        Fragt CSP nach "Ebenen zusammenführen" -> OK.
-- Krita:      Fragt evtl. nach PNG-Optionen -> OK.
-              "Transparenz speichern" muss an sein.
-- PhotoCraft: Meldet evtl., dass Ebenen beim PNG-Speichern
-              zusammengefügt werden -> OK.
+Alle drei öffnen und speichern PSD-Dateien mit Ebenen und Ordnern.
+Einfach mit Strg+S speichern, die Datei bleibt eine PSD.
 
 Krita braucht beim ersten Start ein paar Sekunden.
 
@@ -153,8 +177,9 @@ WAS AUTOMATISCH PASSIERT (beim ersten "Ansicht an CSP")
 EINSTELLUNGEN (Panel > "Einstellungen" aufklappen)
 --------------------------------------------------
 Aufnahmegröße (Ansicht)  Längste Bildseite bei einer Ansicht (Standard 2048)
-Kachelgröße (Rundum)     Längste Seite pro Kachel im Raster (Standard 1024)
-Rundum-Ansichten         6 / 8 / 10
+Bildgröße (Rundum)       Längste Seite jeder Ansicht im Rundum-Modus
+                         (Standard 2048)
+Rundum-Ansichten         6 / 8 / 10 (Standard 10)
 Neue Textur              2048 oder 4096 px
 Winkel (Ansicht)         80. Schräge Flächen über diesem Winkel
                          werden nicht bemalt.
@@ -164,30 +189,38 @@ Exe                      Pfad zum gewählten Mal-Programm
 
 WENN WAS NICHT KLAPPT
 ---------------------
+Pinsel malt nicht
+    -> Ist die Ebene "malen" angeklickt (nicht der Ordner)?
+       Ist der Ordner sichtbar (Auge an)?
+
 "CSP nicht gefunden" / "Kein Pfad für ... eingetragen"
     -> Pfad in den Einstellungen prüfen.
 
 "Nichts Neues gemalt"
     -> Auf der gespeicherten Datei hat sich nichts geändert.
 
-"Das Raster hat die falsche Größe"
+"Das Bild hat die falsche Größe"
     -> Leinwand im Mal-Programm wurde verändert. "Verwerfen" und neu.
 
-Graue Ränder um das Gemalte
-    -> Weicher Pinsel. Vorlage vor Strg+S ausblenden.
+"Die Datei ist keine PSD"
+    -> Im Mal-Programm als PSD speichern, nicht als PNG oder CLIP.
 
 Farbe sieht an Kanten matschig aus
     -> Frontal auf die Stelle schauen und nochmal mit einer Ansicht malen.
 
-Großes Raster macht das Mal-Programm langsam
-    -> Kachelgröße in den Einstellungen kleiner stellen (z. B. 768).
+PSD macht das Mal-Programm langsam
+    -> "Bildgröße (Rundum)" in den Einstellungen kleiner stellen
+       (z. B. 1536) oder 6 statt 10 Ansichten nehmen.
 
 
 WO DIE BILDER LIEGEN
 --------------------
 Blender-Datei gespeichert:  neben der .blend im Ordner  <name>_texturpainter
-                            (Unterordner "templates" = Kopien der Vorlagen)
-Noch nicht gespeichert:     im Blender-Temp-Ordner (weg nach dem Schließen)
+                            - die PSD-Dateien
+                            - "templates" und "..._views" = Kopien der Vorlagen
+                            - "..._backup.npz" = Textur vor der Runde
+Noch nicht gespeichert:     im Blender-Temp-Ordner, zieht beim ersten
+                            Speichern neben die .blend um
 
 Die bemalte Textur steckt in der .blend-Datei.
 Also am Ende: "Blender-Datei speichern".

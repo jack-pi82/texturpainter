@@ -24,6 +24,13 @@ PhotoCraft or another program: expand the add-on > enter the path
 to the .exe. If a program is installed elsewhere, change the path there.
 
 
+TIP FIRST: SAVE THE BLENDER FILE
+--------------------------------
+Save your .blend once before you start. Then all images live next to the
+.blend right away and you can stop any time and continue later.
+(Forgot it? No problem either, see "Continue later".)
+
+
 THE PANEL
 ---------
 3D Viewport > press N > tab "Texturpainter". From top to bottom:
@@ -48,23 +55,78 @@ Instead of "CSP" the buttons show the program you picked,
 e.g. "View to Krita".
 
 
-HOW TO PAINT
-------------
+HOW TO PAINT (ONE VIEW)
+-----------------------
 1. Select the model.
 2. Press "View to CSP".
-   -> Your painting program opens with an image of the view.
+   -> Your painting program opens with a PSD file.
       (If it is behind Blender: click it in the taskbar.)
-3. In the painting program:
-   - Create a NEW LAYER and paint on it
-   - The template may stay visible
-   - Ctrl+S, as often as you like
+3. The painting program shows two layers:
+     "paint"     top    -> paint HERE
+     "Template"  bottom -> the image from Blender
+   Click the "paint" layer and paint. Ctrl+S as often as you like.
    -> After every Ctrl+S the painting shows up on the model in Blender
       by itself after about 1 second.
 4. Another side: rotate the model in Blender, press "New view to CSP".
-   -> The new view goes to the painting program.
 5. Repeat.
 6. At the end: "Save Blender file".
    (For a new file Blender asks where to save it.)
+
+
+OPACITY OF THE PAINT LAYER
+--------------------------
+Feel free to set the opacity of "paint" to e.g. 70 % so you can see the
+template's shading through your colour.
+Blender still projects the colour at FULL opacity. The shading on the
+model comes from Blender's lighting, not from your image.
+
+
+ALL-SIDES MODE
+--------------
+Click "All-sides mode: off", it then shows "All-sides mode: ON".
+Then press "All sides to CSP".
+
+You get ONE PSD with one folder per view:
+
+  front, front right, right, back right, back,
+  back left, left, front left, top, bottom
+
+Each folder holds "paint" (top) and "Template" (bottom).
+Only "front" is visible, the others are hidden.
+
+To switch sides:
+1. Turn off the eye of the folder you are done with.
+2. Turn on the eye of the next folder and expand it.
+3. Click its "paint" layer. (Important! Otherwise the program keeps
+   painting on the layer of the previous folder.)
+4. Paint, Ctrl+S.
+
+When you save, Blender reads ALL folders, hidden ones too, and projects
+each from its direction.
+
+IMPORTANT: Do not scale or crop the canvas in the painting program.
+
+In the settings: 6, 8 or 10 views (default 10).
+
+Hidden spots (armpits, inner legs, under the chin): afterwards paint them
+with "All-sides mode: off": rotate the model so you can see the spot,
+press "View to CSP".
+
+
+CONTINUE LATER
+--------------
+1. Press "Save Blender file". Press Ctrl+S in CSP.
+   Both may be closed now.
+2. Later: open the .blend in Blender, open the PSD in CSP
+   (or press "Open again" in Blender).
+3. Just keep painting and press Ctrl+S. Blender picks it up as before,
+   without painting anything twice.
+
+If the .blend was not saved yet when you started, the PSD first lives in
+Blender's temp folder. On the first save it moves next to the .blend
+automatically. The panel then says:
+  "The image now lives next to the .blend file."
+  -> Press "Open again" and close the old tab in the painting program.
 
 
 GOOD TO KNOW
@@ -74,22 +136,11 @@ GOOD TO KNOW
 - Erased something and pressed Ctrl+S? Then it is gone on the model too.
 - Pressed "New view to CSP" without painting? No problem, it just goes on.
 - "Discard" removes everything you painted in the current view.
-- "Open again" = in case you closed the painting program.
+- Accidentally painted on "Template"? It is still picked up.
 - Careful: whatever you paint directly in Blender on the texture while
   a view is open in the painting program gets overwritten by the next
   Ctrl+S there. Press "Discard" or get a new view first, then paint
   in Blender.
-
-
-WHY THE TEMPLATE MAY STAY VISIBLE
----------------------------------
-Blender remembers the template. When projecting, everything that still
-looks exactly like the template is ignored. Only what you newly painted
-lands on the model.
-
-Exception: semi-transparent brushes (airbrush, soft edges) blend with the
-grey of the template when saving. Then a bit of grey gets projected too.
-For such brushes, hide the template layer shortly before Ctrl+S.
 
 
 STATUS IN THE PANEL
@@ -101,36 +152,11 @@ STATUS IN THE PANEL
   !  red message              -> something failed, the reason is shown
 
 
-ALL-SIDES MODE
---------------
-Click "All-sides mode: off", it then shows "All-sides mode: ON".
-Then press "All sides to CSP".
-You get ONE image with all sides next to each other:
-
-  top row:     front | right  | back    | left
-  bottom row:  top   | bottom | (empty) | (empty)
-
-Paint everything, Ctrl+S. Blender cuts the image apart by itself and
-projects every side from its direction.
-
-IMPORTANT: Do not scale or crop the image in the painting program.
-
-In the settings: 6, 8 or 10 views (8 and 10 add 45° views).
-
-Hidden spots (armpits, inner legs, under the chin): afterwards paint them
-with "All-sides mode: off": rotate the model so you can see the spot,
-press "View to CSP".
-
-
 SWITCHING THE PAINTING PROGRAM
 ------------------------------
 At the top of the panel: Clip Studio Paint / Krita / PhotoCraft / Custom.
-
-When saving with Ctrl+S:
-- CSP:        asks to merge layers -> OK.
-- Krita:      may ask for PNG options -> OK.
-              "Store alpha channel" must be on.
-- PhotoCraft: may say that layers are merged for PNG -> OK.
+All three open and save PSD files with layers and folders.
+Just save with Ctrl+S, the file stays a PSD.
 
 Krita needs a few seconds on first start.
 
@@ -150,8 +176,9 @@ WHAT HAPPENS AUTOMATICALLY (first "View to CSP")
 SETTINGS (panel > expand "Settings")
 ------------------------------------
 Capture size (view)     Longest image side for a single view (default 2048)
-Tile size (all sides)   Longest side per tile in the grid (default 1024)
-All-sides views         6 / 8 / 10
+Image size (all sides)  Longest side of each view in all-sides mode
+                        (default 2048)
+All-sides views         6 / 8 / 10 (default 10)
 New texture             2048 or 4096 px
 Angle (view)            80. Faces tilted more than this are not painted.
 Angle (all sides)       60. Not below 55, otherwise gaps remain.
@@ -160,30 +187,38 @@ Exe                     Path to the selected painting program
 
 TROUBLESHOOTING
 ---------------
+The brush does not paint
+    -> Is the "paint" layer selected (not the folder)?
+       Is the folder visible (eye on)?
+
 "CSP not found" / "No path set for ..."
     -> Check the path in the settings.
 
 "Nothing new painted"
     -> Nothing changed in the saved file.
 
-"The grid has the wrong size"
+"The image has the wrong size"
     -> The canvas was changed in the painting program. "Discard" and redo.
 
-Grey edges around the painting
-    -> Soft brush. Hide the template before Ctrl+S.
+"The file is not a PSD file"
+    -> Save as PSD in the painting program, not as PNG or CLIP.
 
 Colour looks smeared at edges
     -> Look straight at the spot and paint it again with a single view.
 
-Big grid makes the painting program slow
-    -> Make the tile size smaller in the settings (e.g. 768).
+The PSD makes the painting program slow
+    -> Lower "Image size (all sides)" in the settings (e.g. 1536)
+       or use 6 instead of 10 views.
 
 
 WHERE THE IMAGES ARE
 --------------------
 Blender file saved:      next to the .blend in the folder  <name>_texturpainter
-                         (subfolder "templates" = copies of the templates)
-Not saved yet:           in Blender's temp folder (gone after closing)
+                         - the PSD files
+                         - "templates" and "..._views" = copies of the templates
+                         - "..._backup.npz" = texture before the round
+Not saved yet:           in Blender's temp folder, moves next to the .blend
+                         on the first save
 
 The painted texture lives inside the .blend file.
 So at the end: "Save Blender file".

@@ -4,7 +4,7 @@
 bl_info = {
     "name": "Texturpainter - paint 3D models in your 2D painting app",
     "author": "jack-pi82",
-    "version": (1, 2, 0),
+    "version": (1, 3, 0),
     "blender": (4, 2, 0),
     "location": "3D Viewport > Sidebar (N) > Texturpainter",
     "description": "Send the view to CSP/Krita/PhotoCraft, paint there, projected back onto the model live",
@@ -15,8 +15,10 @@ import math
 import os
 import re
 import shutil
+import struct
 import subprocess
 import time
+import zlib
 
 import bpy
 import numpy as np
@@ -62,11 +64,23 @@ VIEW_ROTATIONS = {
     "back_right": (90, 0, 135),
     "back_left": (90, 0, -135),
 }
-VIEW_LAYOUTS = {
-    "6": (4, ["front", "right", "back", "left", "top", "bottom"]),
-    "8": (4, ["front", "right", "back", "left", "top", "bottom", "front_left", "front_right"]),
-    "10": (5, ["front", "right", "back", "left", "top",
-               "front_right", "back_right", "back_left", "front_left", "bottom"]),
+VIEW_ORDER = {
+    "6": ["front", "right", "back", "left", "top", "bottom"],
+    "8": ["front", "front_right", "right", "back", "left", "front_left", "top", "bottom"],
+    "10": ["front", "front_right", "right", "back_right", "back", "back_left", "left", "front_left",
+           "top", "bottom"],
+}
+VIEW_LABELS = {
+    "front": "front",
+    "right": "right",
+    "back": "back",
+    "left": "left",
+    "top": "top",
+    "bottom": "bottom",
+    "front_right": "front right",
+    "front_left": "front left",
+    "back_right": "back right",
+    "back_left": "back left",
 }
 
 
@@ -110,8 +124,8 @@ class TEXTURPAINTER_Preferences(bpy.types.AddonPreferences):
         description="Longest image side in pixels when a single view is sent",
     )
     tile_size: IntProperty(
-        name="Tile size (all sides)", default=1024, min=256, max=4096,
-        description="Longest side of each tile in the all-sides grid",
+        name="Image size (all sides)", default=2048, min=256, max=8192,
+        description="Longest side of each view in all-sides mode",
     )
     texture_size: EnumProperty(
         name="Texture size", default="2048",
@@ -119,7 +133,7 @@ class TEXTURPAINTER_Preferences(bpy.types.AddonPreferences):
         description="Size of a newly created texture",
     )
     views: EnumProperty(
-        name="All-sides views", default="6",
+        name="All-sides views", default="10",
         items=[
             ("6", "6 views", "front, back, left, right, top, bottom"),
             ("8", "8 views", "6 views + front left/right at 45°"),
@@ -170,6 +184,7 @@ class TEXTURPAINTER_State(bpy.types.PropertyGroup):
     capture_mtime: StringProperty()  # als Text, FloatProperty ist zu ungenau für Zeitstempel
     object_name: StringProperty()
     image_names: StringProperty()
+    view_names: StringProperty()  # Ordnernamen in der PSD, gleiche Reihenfolge wie image_names
     cols: IntProperty()
     rows: IntProperty()
     tile_w: IntProperty()
@@ -225,9 +240,9 @@ def find_view3d(context):
     return area, region, area.spaces.active, region.data
 
 
-def work_dir():
-    if bpy.data.is_saved:
-        blend = bpy.data.filepath
+def work_dir(blend=None):
+    blend = blend or (bpy.data.filepath if bpy.data.is_saved else "")
+    if blend:
         base = os.path.splitext(os.path.basename(blend))[0]
         folder = os.path.join(os.path.dirname(blend), base + "_texturpainter")
     else:
@@ -236,7 +251,7 @@ def work_dir():
     return folder
 
 
-PNG_NAME = re.compile(r"^[A-Za-z0-9_]+_(view|allsides|ansicht|rundum)_\d{3}\.png$")
+PNG_NAME = re.compile(r"^[A-Za-z0-9_]+_(view|allsides|ansicht|rundum)_\d{3}\.(png|psd)$")
 
 
 def trusted_png_path(state):
@@ -511,15 +526,28 @@ def save_png(img, path):
     img.save()
 
 
-def template_path(png_path):
-    return os.path.join(os.path.dirname(png_path), "templates", os.path.basename(png_path))
+def template_path(capture_path):
+    """Kopie der Vorlage als PNG, damit beim Aufkleben nur Neues erkannt wird."""
+    base = os.path.splitext(os.path.basename(capture_path))[0]
+    return os.path.join(os.path.dirname(capture_path), "templates", base + ".png")
 
 
-def store_template(png_path):
-    """Kopie der Vorlage behalten, damit beim Aufkleben nur Neues erkannt wird."""
-    dst = template_path(png_path)
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copyfile(png_path, dst)
+def to_rgba8(img):
+    """Blender-Bild als (h, w, 4) uint8, Zeilen von oben nach unten."""
+    w, h = img.size
+    buf = np.empty(w * h * 4, dtype=np.float32)
+    img.pixels.foreach_get(buf)
+    return (np.clip(buf.reshape(h, w, 4)[::-1], 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+
+
+def view_layers(rgba):
+    """Ebenen einer Ansicht von unten nach oben: Vorlage, darüber die leere Mal-Ebene.
+    Die Deckkraft der Mal-Ebene wird beim Aufkleben ignoriert, man kann sie also senken,
+    um die Schattierung der Vorlage beim Malen zu sehen."""
+    return [
+        PsdLayer.from_pixels(iface_("Template"), rgba),
+        PsdLayer(iface_("paint")),
+    ]
 
 
 def load_png_pixels(path):
@@ -549,22 +577,92 @@ def remove_template(painted, template):
     return painted, True
 
 
-def obj_bounds(obj):
-    corners = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
-    lo = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
-    hi = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
-    center = (lo + hi) * 0.5
-    radius = max((hi - lo).length * 0.5, 1e-4)
-    return center, radius
-
-
 def forget_capture(state):
+    path = trusted_png_path(state)
+    if path and os.path.isfile(backup_path(path)):
+        try:
+            os.remove(backup_path(path))
+        except OSError:
+            pass
     remove_images([n for n in state.image_names.split("\n") if n])
     state.mode = "NONE"
     state.image_names = ""
     state.png_path = ""
     state.object_name = ""
     _RUNTIME.pop(state.id_data.name, None)
+
+
+def backup_path(capture_path):
+    return os.path.splitext(capture_path)[0] + "_backup.npz"
+
+
+def save_backup(state):
+    """Textur-Stand vor der Runde auf die Platte, damit es nach einem Neustart weitergeht."""
+    path = trusted_png_path(state)
+    data = runtime(state).get("backup")
+    if not path or not data or os.path.isfile(backup_path(path)):
+        return
+    np.savez_compressed(backup_path(path), **data)
+
+
+def load_backup(state):
+    rt = runtime(state)
+    if "backup" in rt:
+        return
+    path = trusted_png_path(state)
+    if path and os.path.isfile(backup_path(path)):
+        with np.load(backup_path(path)) as stored:
+            rt["backup"] = {key: stored[key] for key in stored.files}
+
+
+def move_capture_next_to_blend(state, blend_path):
+    """Liegt die offene Aufnahme noch im Temp-Ordner, kommt sie beim Speichern neben die .blend."""
+    old = trusted_png_path(state)
+    if not old or not os.path.isfile(old):
+        return
+    new_folder = work_dir(blend_path)
+    if os.path.normcase(os.path.dirname(old)) == os.path.normcase(new_folder):
+        return
+    new = os.path.join(new_folder, os.path.basename(old))
+    shutil.copy2(old, new)  # copy2 behält das Änderungsdatum, Live-Erkennung bleibt gleich
+    for src, dst in ((template_path(old), template_path(new)), (backup_path(old), backup_path(new))):
+        if os.path.isfile(src):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+    if os.path.isdir(tiles_dir_for(old)):
+        shutil.copytree(tiles_dir_for(old), tiles_dir_for(new), dirs_exist_ok=True)
+    for name in [n for n in state.image_names.split("\n") if n]:
+        img = bpy.data.images.get(name)
+        if img is None or not img.filepath_raw:
+            continue
+        base = os.path.basename(bpy.path.abspath(img.filepath_raw))
+        for folder in (tiles_dir_for(new), os.path.dirname(template_path(new))):
+            if os.path.isfile(os.path.join(folder, base)):
+                img.filepath_raw = os.path.join(folder, base)
+                break
+    state.png_path = new
+    runtime(state)["moved"] = True
+
+
+@bpy.app.handlers.persistent
+def _on_load_post(*_args):
+    _RUNTIME.clear()  # Sicherungen gehören zur alten Datei; die neue lädt ihre von der Platte
+
+
+@bpy.app.handlers.persistent
+def _on_save_pre(*args):
+    blend_path = next((a for a in args if isinstance(a, str) and a), bpy.data.filepath)
+    if not blend_path:
+        return
+    for scene in bpy.data.scenes:
+        state = scene.texturpainter
+        if state.mode == "NONE":
+            continue
+        try:
+            move_capture_next_to_blend(state, blend_path)
+            save_backup(state)
+        except OSError as ex:
+            runtime(state)["live_error"] = rpt_("Live update failed: {}").format(ex)
 
 
 def backup_canvases(state, canvases):
@@ -584,6 +682,7 @@ def backup_canvases(state, canvases):
 
 
 def restore_canvases(state):
+    load_backup(state)
     restored = []
     for name, arr in runtime(state).get("backup", {}).items():
         img = bpy.data.images.get(name)
@@ -602,15 +701,18 @@ def capture_single(context, prefs, state, obj, area, region, space):
     folder = work_dir()
     state.counter += 1
     clean = bpy.path.clean_name(obj.name)
-    path = os.path.join(folder, f"{clean}_view_{state.counter:03d}.png")
+    path = os.path.join(folder, f"{clean}_view_{state.counter:03d}.psd")
 
     size = grab_size_for_region(region, prefs.grab_size)
     with CleanViewport(context, space, obj):
         img = capture_image(context, area, region, size)
     remove_images([f"Texturpainter View {clean}"])
     img.name = f"Texturpainter View {clean}"
-    save_png(img, path)
-    store_template(path)
+    template_file = template_path(path)
+    os.makedirs(os.path.dirname(template_file), exist_ok=True)
+    save_png(img, template_file)
+    rgba = to_rgba8(img)
+    psd_write(path, img.size[0], img.size[1], view_layers(rgba), rgba)
 
     state.mode = "SINGLE"
     state.png_path = path
@@ -620,18 +722,36 @@ def capture_single(context, prefs, state, obj, area, region, space):
     return path
 
 
+def world_vertices(context, obj):
+    depsgraph = context.evaluated_depsgraph_get()
+    ev = obj.evaluated_get(depsgraph)
+    mesh = ev.to_mesh()
+    try:
+        co = np.empty(len(mesh.vertices) * 3, dtype=np.float64)
+        mesh.vertices.foreach_get("co", co)
+    finally:
+        ev.to_mesh_clear()
+    mw = np.array(obj.matrix_world)
+    return co.reshape(-1, 3) @ mw[:3, :3].T + mw[:3, 3]
+
+
+def tiles_dir_for(png_path):
+    base = os.path.splitext(os.path.basename(png_path))[0]
+    return os.path.join(os.path.dirname(png_path), base + "_views")
+
+
 def capture_grid(context, prefs, state, obj, area, region, space, rv3d):
+    """Rundum-Modus: jede Ansicht als eigener Ordner (Vorlage + Mal-Ebene) in einer PSD."""
     folder = work_dir()
     state.counter += 1
     clean = bpy.path.clean_name(obj.name)
-    tiles_dir = os.path.join(folder, f"{clean}_tiles")
+    path = os.path.join(folder, f"{clean}_allsides_{state.counter:03d}.psd")
+    tiles_dir = tiles_dir_for(path)
     os.makedirs(tiles_dir, exist_ok=True)
-    path = os.path.join(folder, f"{clean}_allsides_{state.counter:03d}.png")
 
-    cols, keys = VIEW_LAYOUTS[prefs.views]
-    rows = math.ceil(len(keys) / cols)
+    keys = VIEW_ORDER[prefs.views]
     size = grab_size_for_region(region, prefs.tile_size)
-    center, radius = obj_bounds(obj)
+    verts = world_vertices(context, obj)
 
     saved_view = (
         rv3d.view_rotation.copy(), rv3d.view_location.copy(),
@@ -641,22 +761,26 @@ def capture_grid(context, prefs, state, obj, area, region, space, rv3d):
     try:
         with CleanViewport(context, space, obj):
             rv3d.view_perspective = "ORTHO"
-            rv3d.view_location = center
-            rv3d.view_rotation = Euler([math.radians(a) for a in VIEW_ROTATIONS["front"]]).to_quaternion()
             rv3d.view_distance = 1.0
             rv3d.update()
             wm = rv3d.window_matrix
             half_w = 1.0 / abs(wm[0][0]) if wm[0][0] else 1.0
             half_h = 1.0 / abs(wm[1][1]) if wm[1][1] else 1.0
-            dist = radius * 1.05 / min(half_w, half_h)
 
             for key in keys:
-                rv3d.view_location = center
-                rv3d.view_rotation = Euler([math.radians(a) for a in VIEW_ROTATIONS[key]]).to_quaternion()
-                rv3d.view_distance = dist
+                quat = Euler([math.radians(a) for a in VIEW_ROTATIONS[key]]).to_quaternion()
+                rot = np.array(quat.to_matrix())
+                local = verts @ rot  # Koordinaten im Blick-Raum: x rechts, y oben
+                lo, hi = local.min(axis=0), local.max(axis=0)
+                mid = (lo + hi) * 0.5
+                ext = np.maximum((hi - lo) * 0.5, 1e-4)
+                # jede Ansicht eng um das Modell einrahmen
+                rv3d.view_rotation = quat
+                rv3d.view_location = Vector(rot @ mid)
+                rv3d.view_distance = 1.05 * max(ext[0] / half_w, ext[1] / half_h)
                 rv3d.update()
                 img = capture_image(context, area, region, size)
-                name = f"Texturpainter Tile {clean} {key}"
+                name = f"Texturpainter View {clean} {key}"
                 remove_images([name])
                 img.name = name
                 save_png(img, os.path.join(tiles_dir, f"{key}.png"))
@@ -670,30 +794,287 @@ def capture_grid(context, prefs, state, obj, area, region, space, rv3d):
         if tuple(t.size) != (tw, th):
             raise CSPError(rpt_("The tiles came out in different sizes. Please try again."))
 
-    # Raster zusammensetzen (Blender-Pixel laufen von unten nach oben)
-    grid = np.zeros((rows * th, cols * tw, 4), dtype=np.float32)
-    buf = np.empty(tw * th * 4, dtype=np.float32)
-    for i, t in enumerate(tiles):
-        t.pixels.foreach_get(buf)
-        col = i % cols
-        row = rows - 1 - (i // cols)
-        grid[row * th:(row + 1) * th, col * tw:(col + 1) * tw] = buf.reshape(th, tw, 4)
-
-    grid_img = bpy.data.images.new(f"Texturpainter Grid {clean}", cols * tw, rows * th, alpha=True)
-    try:
-        grid_img.pixels.foreach_set(grid.ravel())
-        save_png(grid_img, path)
-    finally:
-        bpy.data.images.remove(grid_img)
-    store_template(path)
+    view_names = [iface_(VIEW_LABELS[k]) for k in keys]
+    layers = []
+    first_rgba = None
+    # PSD-Ebenen laufen von unten nach oben: erste Ansicht (vorne) ganz oben
+    for i in reversed(range(len(tiles))):
+        rgba = to_rgba8(tiles[i])
+        if i == 0:
+            first_rgba = rgba
+        layers.append(PsdLayer.divider())
+        layers.extend(view_layers(rgba))
+        layers.append(PsdLayer.folder(view_names[i], hidden=i != 0, opened=i == 0))
+    psd_write(path, tw, th, layers, first_rgba)
 
     state.mode = "GRID"
     state.png_path = path
     state.capture_mtime = repr(os.path.getmtime(path))
     state.object_name = obj.name
     state.image_names = "\n".join(t.name for t in tiles)
-    state.cols, state.rows, state.tile_w, state.tile_h = cols, rows, tw, th
+    state.view_names = "\n".join(view_names)
+    state.cols, state.rows, state.tile_w, state.tile_h = len(tiles), 1, tw, th
     return path
+
+
+# ---------------------------------------------------------------------------
+# PSD: minimaler Schreiber/Leser für 8-Bit-RGB mit Ebenen und Ordnern
+# ---------------------------------------------------------------------------
+
+class PsdLayer:
+    """Eine PSD-Ebene. rgba = (h, w, 4) uint8, Zeilen von oben nach unten."""
+
+    def __init__(self, name, rgba=None, top=0, left=0, opacity=255, hidden=False, section=0, locked=False,
+                 blend=b"norm"):
+        self.name = name
+        self.rgba = rgba
+        self.top = top
+        self.left = left
+        self.opacity = opacity
+        self.hidden = hidden
+        self.section = section  # 0 Ebene, 1 offener Ordner, 2 geschlossener Ordner, 3 Ordner-Ende
+        self.locked = locked
+        self.blend = blend
+
+    @classmethod
+    def from_pixels(cls, name, rgba, locked=False, blend=b"norm"):
+        """Auf den nicht durchsichtigen Bereich zuschneiden, damit die Datei klein bleibt."""
+        ys, xs = np.nonzero(rgba[..., 3])
+        if len(ys) == 0:
+            return cls(name, locked=locked, blend=blend)
+        t, b, l, r = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+        return cls(name, np.ascontiguousarray(rgba[t:b, l:r]), top=int(t), left=int(l), locked=locked,
+                   blend=blend)
+
+    @classmethod
+    def folder(cls, name, hidden=False, opened=False):
+        return cls(name, hidden=hidden, section=1 if opened else 2)
+
+    @classmethod
+    def divider(cls):
+        return cls("</Layer group>", section=3)
+
+
+def _psd_block(key, payload):
+    payload += b"\0" * ((-len(payload)) % 4)
+    return b"8BIM" + key + struct.pack(">I", len(payload)) + payload
+
+
+def _psd_pascal(name):
+    raw = name.encode("ascii", "replace")[:255]
+    data = bytes([len(raw)]) + raw
+    return data + b"\0" * ((-len(data)) % 4)
+
+
+def psd_write(path, width, height, layers, composite):
+    """layers von unten nach oben. Pixel unkomprimiert (Raw), das versteht jedes Programm."""
+    records = bytearray()
+    channel_data = bytearray()
+    for layer in layers:
+        if layer.rgba is None:
+            t = l = b = r = 0
+            planes = [b""] * 4
+        else:
+            h, w = layer.rgba.shape[:2]
+            t, l, b, r = layer.top, layer.left, layer.top + h, layer.left + w
+            planes = [np.ascontiguousarray(layer.rgba[..., c]).tobytes() for c in (3, 0, 1, 2)]
+        records += struct.pack(">iiiiH", t, l, b, r, 4)
+        for cid, plane in zip((-1, 0, 1, 2), planes):
+            records += struct.pack(">hI", cid, len(plane) + 2)
+            channel_data += struct.pack(">H", 0) + plane
+        flags = 0x02 if layer.hidden else 0
+        if layer.section:
+            flags |= 0x18
+        records += b"8BIM" + layer.blend + struct.pack(">BBBB", layer.opacity, 0, flags, 0)
+        extra = struct.pack(">II", 0, 0) + _psd_pascal(layer.name)
+        extra += _psd_block(b"luni", struct.pack(">I", len(layer.name)) + layer.name.encode("utf-16-be"))
+        if layer.section:
+            extra += _psd_block(b"lsct", struct.pack(">I", layer.section))
+        if layer.locked:
+            extra += _psd_block(b"lspf", struct.pack(">I", 0x02 | 0x04))  # Pixel + Position gesperrt
+        records += struct.pack(">I", len(extra)) + extra
+
+    info = struct.pack(">h", -len(layers)) + bytes(records) + bytes(channel_data)
+    info += b"\0" * (len(info) % 2)
+    layer_mask = struct.pack(">I", len(info)) + info + struct.pack(">I", 0)
+
+    with open(path, "wb") as f:
+        f.write(b"8BPS" + struct.pack(">H6xHIIHH", 1, 4, height, width, 8, 3))
+        f.write(struct.pack(">I", 0))  # Farbmodus-Daten
+        f.write(struct.pack(">I", 0))  # Bild-Ressourcen
+        f.write(struct.pack(">I", len(layer_mask)))
+        f.write(layer_mask)
+        f.write(struct.pack(">H", 0))
+        for c in (0, 1, 2, 3):
+            f.write(np.ascontiguousarray(composite[..., c]).tobytes())
+
+
+def _unpackbits(data, size):
+    out = bytearray()
+    i, n = 0, len(data)
+    while i < n and len(out) < size:
+        c = data[i]
+        i += 1
+        if c < 128:
+            out += data[i:i + c + 1]
+            i += c + 1
+        elif c > 128:
+            out += bytes((data[i],)) * (257 - c)
+            i += 1
+    if len(out) < size:
+        out += b"\0" * (size - len(out))
+    return bytes(out[:size])
+
+
+def _psd_channel(data, comp, h, w):
+    size = h * w
+    if comp == 0:
+        raw = data[:size]
+    elif comp == 1:
+        raw = _unpackbits(data[2 * h:], size)  # Zeilenlängen überspringen
+    elif comp in (2, 3):
+        raw = zlib.decompress(data)[:size]
+    else:
+        raise CSPError(rpt_("Unsupported PSD compression ({}).").format(comp))
+    arr = np.frombuffer(raw, dtype=np.uint8).reshape(h, w)
+    if comp == 3:
+        arr = (np.cumsum(arr, axis=1, dtype=np.uint64) & 0xFF).astype(np.uint8)
+    return arr
+
+
+def psd_read(path):
+    """Gibt (Breite, Höhe, Ebenen von unten nach oben) zurück."""
+    with open(path, "rb") as f:
+        data = f.read()
+    if data[:4] != b"8BPS" or struct.unpack(">H", data[4:6])[0] != 1:
+        raise CSPError(rpt_("The file is not a PSD file. Please save as PSD."))
+    _nch, height, width, depth, mode = struct.unpack(">HIIHH", data[12:26])
+    if depth != 8 or mode != 3:
+        raise CSPError(rpt_("Only 8-bit RGB PSD files are supported."))
+    pos = 26
+    for _ in range(2):  # Farbmodus-Daten, Bild-Ressourcen
+        pos += 4 + struct.unpack(">I", data[pos:pos + 4])[0]
+    pos += 4  # Länge Ebenen-/Maskenbereich
+    info_len = struct.unpack(">I", data[pos:pos + 4])[0]
+    pos += 4
+    if info_len == 0:
+        return width, height, []
+    count = abs(struct.unpack(">h", data[pos:pos + 2])[0])
+    pos += 2
+
+    records = []
+    for _ in range(count):
+        t, l, b, r, nch = struct.unpack(">iiiiH", data[pos:pos + 18])
+        pos += 18
+        channels = []
+        for _c in range(nch):
+            cid, clen = struct.unpack(">hI", data[pos:pos + 6])
+            channels.append((cid, clen))
+            pos += 6
+        opacity, flags = data[pos + 8], data[pos + 10]
+        extra_len = struct.unpack(">I", data[pos + 12:pos + 16])[0]
+        pos += 16
+        end = pos + extra_len
+        p = pos
+        p += 4 + struct.unpack(">I", data[p:p + 4])[0]  # Ebenenmaske
+        p += 4 + struct.unpack(">I", data[p:p + 4])[0]  # Mischbereiche
+        name_len = data[p]
+        name = data[p + 1:p + 1 + name_len].decode("latin-1")
+        p += 1 + name_len
+        p += (-(1 + name_len)) % 4
+        section = 0
+        while p + 12 <= end and data[p:p + 4] in (b"8BIM", b"8B64"):
+            key = data[p + 4:p + 8]
+            blen = struct.unpack(">I", data[p + 8:p + 12])[0]
+            block = data[p + 12:p + 12 + blen]
+            if key == b"luni" and len(block) >= 4:
+                n = struct.unpack(">I", block[:4])[0]
+                name = block[4:4 + 2 * n].decode("utf-16-be", "replace")
+            elif key in (b"lsct", b"lsdk") and len(block) >= 4:
+                section = struct.unpack(">I", block[:4])[0]
+            p += 12 + blen
+        pos = end
+        layer = PsdLayer(name, top=t, left=l, opacity=opacity, hidden=bool(flags & 0x02), section=section)
+        layer._rect = (t, l, b, r)
+        layer._channels = channels
+        records.append(layer)
+
+    for layer in records:
+        t, l, b, r = layer._rect
+        h, w = b - t, r - l
+        planes = {}
+        for cid, clen in layer._channels:
+            comp = struct.unpack(">H", data[pos:pos + 2])[0]
+            chunk = data[pos + 2:pos + clen]
+            pos += clen
+            if h > 0 and w > 0 and cid in (-1, 0, 1, 2):
+                planes[cid] = _psd_channel(chunk, comp, h, w)
+        if h > 0 and w > 0 and all(c in planes for c in (0, 1, 2)):
+            alpha = planes.get(-1, np.full((h, w), 255, dtype=np.uint8))
+            layer.rgba = np.dstack([planes[0], planes[1], planes[2], alpha])
+    return width, height, records
+
+
+def psd_folders(layers):
+    """Oberste Ordner als [(Name, Ebenen von unten nach oben)], in Dateireihenfolge."""
+    stack = [[]]
+    for layer in layers:
+        if layer.section == 3:
+            stack.append([])
+        elif layer.section in (1, 2):
+            children = stack.pop() if len(stack) > 1 else []
+            stack[-1].append((layer.name, children))
+        else:
+            stack[-1].append(layer)
+
+    def leaves(children):
+        for child in children:
+            if isinstance(child, tuple):
+                yield from leaves(child[1])
+            else:
+                yield child
+
+    return [(child[0], list(leaves(child[1]))) for child in stack[0] if isinstance(child, tuple)]
+
+
+TEMPLATE_LAYER_NAMES = {"Template", "Vorlage"}
+
+
+def _layer_canvas(layer, width, height):
+    """Ebenen-Pixel auf voller Leinwand. Die Ebenen-Deckkraft zählt absichtlich nicht:
+    sie ist nur zum Sehen beim Malen da, aufs Modell kommt die volle Farbe."""
+    out = np.zeros((height, width, 4), dtype=np.float32)
+    if layer.rgba is None:
+        return out
+    t, l = layer.top, layer.left
+    h, w = layer.rgba.shape[:2]
+    y0, x0, y1, x1 = max(t, 0), max(l, 0), min(t + h, height), min(l + w, width)
+    if y1 > y0 and x1 > x0:
+        out[y0:y1, x0:x1] = layer.rgba[y0 - t:y1 - t, x0 - l:x1 - l].astype(np.float32) / 255.0
+    return out
+
+
+def _over(dst, src):
+    a_src, a_dst = src[..., 3:4], dst[..., 3:4]
+    a_out = a_src + a_dst * (1.0 - a_src)
+    rgb = src[..., :3] * a_src + dst[..., :3] * a_dst * (1.0 - a_src)
+    dst[..., :3] = np.where(a_out > 0, rgb / np.maximum(a_out, 1e-6), 0.0)
+    dst[..., 3:4] = a_out
+
+
+def compose_view(leaves, width, height, template):
+    """Alles, was in einem Ordner neu gemalt wurde. Die Vorlage selbst zählt nur, wo sie übermalt wurde."""
+    out = np.zeros((height, width, 4), dtype=np.float32)
+    for layer in leaves:
+        if layer.rgba is None:
+            continue
+        if layer.name in TEMPLATE_LAYER_NAMES and template is None:
+            continue
+        pixels = _layer_canvas(layer, width, height)
+        if layer.name in TEMPLATE_LAYER_NAMES:
+            pixels, _ = remove_template(pixels, template)
+        _over(out, pixels)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -748,54 +1129,65 @@ def apply_pending(op, context, prefs, state, area, region, final=True):
         if img is None:
             forget_capture(state)
             raise CSPError(rpt_("The capture data is missing in Blender. Please capture again."))
-        template = None
-        if os.path.isfile(template_path(trusted_png_path(state))):
-            template = load_png_pixels(template_path(trusted_png_path(state)))
-        elif img.size[0] > 0:
-            # ältere Aufnahme ohne Vorlage-Kopie: das Bild im Speicher ist noch die Vorlage
-            w, h = img.size
-            template = np.empty(w * h * 4, dtype=np.float32)
-            img.pixels.foreach_get(template)
-            template = template.reshape(h, w, 4)
-        img.filepath_raw = trusted_png_path(state)
-        img.reload()
-        painted = load_png_pixels(trusted_png_path(state))
-        painted, masked = remove_template(painted, template)
-        check_painted(op, painted, masked, prefs)
+        path = trusted_png_path(state)
+        template_file = template_path(path)
+        template = load_png_pixels(template_file) if os.path.isfile(template_file) else None  # unten→oben
+        if path.endswith(".psd"):
+            width, height, layers = psd_read(path)
+            if tuple(img.size) != (width, height):
+                raise CSPError(rpt_("The image has the wrong size ({} x {} instead of {} x {}). "
+                                    "Please do not scale or crop the canvas in the painting program.")
+                               .format(width, height, img.size[0], img.size[1]))
+            leaves = [layer for layer in layers if layer.section == 0]
+            painted = compose_view(leaves, width, height, None if template is None else template[::-1])[::-1]
+            check_painted(op, painted, True, prefs)
+        else:
+            # Aufnahme aus einer älteren Version (flache PNG)
+            painted, masked = remove_template(load_png_pixels(path), template)
+            check_painted(op, painted, masked, prefs)
         if tuple(img.size) != (painted.shape[1], painted.shape[0]):
             img.scale(painted.shape[1], painted.shape[0])
         img.pixels.foreach_set(np.ascontiguousarray(painted).ravel())
         img.update()
         project(context, area, region, img)
     else:
-        grid = load_png_pixels(trusted_png_path(state))
-        gh, gw = grid.shape[:2]
-        tw, th, cols, rows = state.tile_w, state.tile_h, state.cols, state.rows
-        if (gw, gh) != (cols * tw, rows * th):
-            raise CSPError(rpt_("The grid has the wrong size ({} x {} instead of {} x {}). "
+        path = trusted_png_path(state)
+        tw, th = state.tile_w, state.tile_h
+        width, height, layers = psd_read(path)
+        if (width, height) != (tw, th):
+            raise CSPError(rpt_("The image has the wrong size ({} x {} instead of {} x {}). "
                                 "Please do not scale or crop the canvas in the painting program.")
-                           .format(gw, gh, cols * tw, rows * th))
-        template = None
-        if os.path.isfile(template_path(trusted_png_path(state))):
-            template = load_png_pixels(template_path(trusted_png_path(state)))
-        grid, masked = remove_template(grid, template)
-        check_painted(op, grid, masked, prefs)
+                           .format(width, height, tw, th))
+        folders = psd_folders(layers)
+        by_name = {fname: leaves for fname, leaves in folders}
+        view_names = [n for n in state.view_names.split("\n") if n]
+        tiles_dir = tiles_dir_for(path)
+        painted_any = False
 
         for i, name in enumerate(names):
             tile = bpy.data.images.get(name)
             if tile is None:
                 forget_capture(state)
                 raise CSPError(rpt_("The capture data is missing in Blender. Please capture again."))
-            col = i % cols
-            row = rows - 1 - (i // cols)
-            part = np.ascontiguousarray(grid[row * th:(row + 1) * th, col * tw:(col + 1) * tw])
+            leaves = by_name.get(view_names[i]) if i < len(view_names) else None
+            if leaves is None and len(folders) == len(names):
+                leaves = folders[len(folders) - 1 - i][1]  # Ordner umbenannt: über die Reihenfolge
+            if not leaves:
+                continue
+            key = name.rsplit(" ", 1)[-1]
+            template_file = os.path.join(tiles_dir, f"{key}.png")
+            template = load_png_pixels(template_file)[::-1] if os.path.isfile(template_file) else None
+            part = compose_view(leaves, width, height, template)
             if float(part[..., 3].max()) < 0.004:
-                continue  # auf dieser Kachel wurde nichts gemalt
+                continue  # in diesem Ordner wurde nichts gemalt
+            painted_any = True
             if tuple(tile.size) != (tw, th):
                 tile.scale(tw, th)
-            tile.pixels.foreach_set(part.ravel())
+            tile.pixels.foreach_set(np.ascontiguousarray(part[::-1]).ravel())
             tile.update()
             project(context, area, region, tile)
+        if not painted_any:
+            raise CSPError(rpt_("Nothing new painted - did you save in {} with Ctrl+S?").format(painter_name(prefs)))
 
     persist_canvases(canvases)
     if final:
@@ -879,6 +1271,7 @@ class TEXTURPAINTER_OT_reopen(bpy.types.Operator):
             if state.mode == "NONE" or not os.path.isfile(trusted_png_path(state)):
                 raise CSPError(rpt_("There is no open capture."))
             open_in_painter(prefs, trusted_png_path(state))
+            runtime(state).pop("moved", None)
         except CSPError as ex:
             self.report({"ERROR"}, str(ex))
             return {"CANCELLED"}
@@ -933,6 +1326,9 @@ class TEXTURPAINTER_PT_main(bpy.types.Panel):
             box.label(text=iface_("Paint in {} + Ctrl+S").format(name), icon="TIME", translate=False)
         if state.mode != "NONE" and rt.get("live_error"):
             box.label(text=rt["live_error"], icon="ERROR", translate=False)
+        if state.mode != "NONE" and rt.get("moved"):
+            box.label(text="The image now lives next to the .blend file.", icon="FILE_FOLDER")
+            box.label(text="Press 'Open again', close the old tab.")
 
         if state.use_grid:
             label = iface_("All sides to {}")
@@ -1051,8 +1447,24 @@ GERMAN = {
     "Capture size (view)": "Aufnahmegröße (Ansicht)",
     "Longest image side in pixels when a single view is sent":
         "Längste Bildseite in Pixeln, wenn eine einzelne Ansicht geschickt wird",
-    "Tile size (all sides)": "Kachelgröße (Rundum)",
-    "Longest side of each tile in the all-sides grid": "Längste Seite jeder Kachel im Rundum-Raster",
+    "Image size (all sides)": "Bildgröße (Rundum)",
+    "Longest side of each view in all-sides mode": "Längste Seite jeder Ansicht im Rundum-Modus",
+    # Ordner und Ebenen in der PSD
+    "Template": "Vorlage",
+    "paint": "malen",
+    "front": "vorne",
+    "right": "rechts",
+    "back": "hinten",
+    "left": "links",
+    "top": "oben",
+    "bottom": "unten",
+    "front right": "vorne rechts",
+    "front left": "vorne links",
+    "back right": "hinten rechts",
+    "back left": "hinten links",
+    "Unsupported PSD compression ({}).": "Nicht unterstützte PSD-Komprimierung ({}).",
+    "The file is not a PSD file. Please save as PSD.": "Die Datei ist keine PSD. Bitte als PSD speichern.",
+    "Only 8-bit RGB PSD files are supported.": "Nur 8-Bit-RGB-PSD-Dateien werden unterstützt.",
     "Texture size": "Texturgröße",
     "Size of a newly created texture": "Größe einer neu angelegten Textur",
     "All-sides views": "Rundum-Ansichten",
@@ -1082,6 +1494,8 @@ GERMAN = {
     "On the model ({})": "Auf dem Modell ({})",
     "Keep painting + Ctrl+S, or rotate + button": "Weiter malen + Strg+S, oder drehen + Knopf",
     "Paint in {} + Ctrl+S": "In {} malen + Strg+S",
+    "The image now lives next to the .blend file.": "Das Bild liegt jetzt neben der .blend-Datei.",
+    "Press 'Open again', close the old tab.": "'Nochmal öffnen' drücken, alten Tab schließen.",
     "All sides to {}": "Rundum an {}",
     "New view to {}": "Neue Ansicht an {}",
     "View to {}": "Ansicht an {}",
@@ -1127,9 +1541,9 @@ GERMAN = {
         "Die PNG der letzten Aufnahme fehlt. Aufnahme verworfen.",
     "The capture data is missing in Blender. Please capture again.":
         "Die Aufnahme-Daten fehlen in Blender. Bitte neu aufnehmen.",
-    "The grid has the wrong size ({} x {} instead of {} x {}). "
+    "The image has the wrong size ({} x {} instead of {} x {}). "
     "Please do not scale or crop the canvas in the painting program.":
-        "Das Raster hat die falsche Größe ({} x {} statt {} x {}). "
+        "Das Bild hat die falsche Größe ({} x {} statt {} x {}). "
         "Bitte die Leinwand im Mal-Programm nicht skalieren oder zuschneiden.",
     "New view is open in {}.": "Neue Ansicht ist in {}.",
     "Saved: {}": "Gespeichert: {}",
@@ -1154,9 +1568,17 @@ def register():
     bpy.types.Scene.texturpainter = PointerProperty(type=TEXTURPAINTER_State)
     if not bpy.app.timers.is_registered(_redraw_timer):
         bpy.app.timers.register(_redraw_timer, first_interval=1.0, persistent=True)
+    if _on_save_pre not in bpy.app.handlers.save_pre:
+        bpy.app.handlers.save_pre.append(_on_save_pre)
+    if _on_load_post not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(_on_load_post)
 
 
 def unregister():
+    if _on_save_pre in bpy.app.handlers.save_pre:
+        bpy.app.handlers.save_pre.remove(_on_save_pre)
+    if _on_load_post in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(_on_load_post)
     if bpy.app.timers.is_registered(_redraw_timer):
         bpy.app.timers.unregister(_redraw_timer)
     del bpy.types.Scene.texturpainter
