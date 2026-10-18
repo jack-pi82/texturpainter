@@ -1,0 +1,178 @@
+TEXTURPAINTER - 3D-Modelle mit CSP, Krita oder PhotoCraft bemalen
+=========================================================================
+
+Du malst in deinem Mal-Programm, Blender klebt es live aufs Modell.
+UVs musst du nie anfassen.
+
+Getestet mit: Clip Studio Paint, Krita, PhotoCraft
+              Blender 5.3 und 5.2
+
+
+EINMAL INSTALLIEREN
+-------------------
+1. Blender: Bearbeiten > Einstellungen > Add-ons
+2. Oben rechts auf den kleinen Pfeil (v) > "Von Datenträger installieren"
+3. Die Datei  texturpainter.py  auswählen
+4. Haken bei "Texturpainter" setzen
+5. Fertig. In der 3D-Ansicht N drücken > Reiter "Texturpainter"
+
+Das Addon spricht die Sprache, die in Blender eingestellt ist
+(Deutsch oder Englisch, andere Sprachen zeigen Englisch).
+
+Die Standard-Pfade zu CSP und Krita sind schon eingetragen.
+PhotoCraft oder ein anderes Programm: Add-on aufklappen > Pfad zur .exe
+eintragen. Liegt ein Programm woanders: dort den Pfad ändern.
+
+
+DAS PANEL
+---------
+  [ Mal-Programm wählen       ]
+  [ Rundum-Modus: an/aus      ]
+  | Status                    |
+  [   ANSICHT AN CSP          ]   <- großer Knopf
+  [ Nochmal öffnen | Verwerfen ]
+  [ Blender-Datei speichern   ]
+
+
+SO MALST DU
+-----------
+1. Modell anklicken.
+2. Großen Knopf drücken.
+   -> Dein Mal-Programm geht mit einem Bild der Ansicht auf.
+      (Liegt es hinter Blender: in der Taskleiste anklicken.)
+3. Im Mal-Programm:
+   - NEUE EBENE anlegen und darauf malen
+   - Die Vorlage darf sichtbar bleiben
+   - Strg+S, so oft du willst
+   -> Nach jedem Strg+S erscheint das Gemalte nach ca. 1 Sekunde
+      von selbst auf dem Modell in Blender.
+4. Andere Seite: In Blender das Modell drehen, großen Knopf drücken.
+   -> Die neue Ansicht geht ans Mal-Programm.
+5. Wiederholen.
+6. Zum Schluss: "Blender-Datei speichern".
+   (Bei einer neuen Datei fragt Blender, wohin.)
+
+
+GUT ZU WISSEN
+-------------
+- Mehrmals Strg+S ist kein Problem. Nichts wird doppelt aufgemalt,
+  auch nicht mit halbdurchsichtigen Pinseln.
+- Etwas wegradiert und Strg+S? Dann ist es auch auf dem Modell weg.
+- Großen Knopf gedrückt, ohne zu malen? Egal, es geht einfach weiter.
+- "Verwerfen" nimmt alles zurück, was du in der aktuellen Ansicht
+  gemalt hast.
+- "Nochmal öffnen" = falls du das Mal-Programm zugemacht hast.
+- Achtung: Was du direkt in Blender auf die Textur malst, während eine
+  Ansicht im Mal-Programm offen ist, wird beim nächsten Strg+S im
+  Mal-Programm überschrieben. Erst "Verwerfen" oder eine neue Ansicht
+  holen, dann in Blender malen.
+
+
+WARUM DIE VORLAGE SICHTBAR BLEIBEN DARF
+---------------------------------------
+Blender merkt sich die Vorlage. Beim Aufkleben wird alles ignoriert,
+was noch genau wie die Vorlage aussieht. Nur was du neu gemalt hast,
+landet auf dem Modell.
+
+Ausnahme: Halbdurchsichtige Pinsel (Airbrush, weiche Ränder) mischen
+sich beim Speichern mit dem Grau der Vorlage. Dann klebt etwas Grau
+mit auf. Für solche Pinsel die Vorlage kurz vor Strg+S ausblenden.
+
+
+DER STATUS IM PANEL
+-------------------
+  i  "Bereit"                 -> Modell drehen, Knopf drücken
+  ⏱  "In ... malen + Strg+S"   -> Im Mal-Programm malen und speichern
+  ✓  "Auf dem Modell (Zeit)"  -> Ist drauf. Weiter malen + Strg+S
+                                 oder drehen + Knopf
+  !  rote Meldung             -> Hat nicht geklappt, Grund steht da
+
+
+RUNDUM-MODUS (alle Seiten auf einmal)
+-------------------------------------
+Knopf "Rundum-Modus" anschalten, dann den großen Knopf drücken.
+Du bekommst EIN Bild mit allen Seiten nebeneinander:
+
+  oben:   vorne | rechts | hinten | links
+  unten:  oben  | unten  | (leer) | (leer)
+
+Alles bemalen, Strg+S. Blender schneidet das Bild selbst auseinander
+und klebt jede Seite aus ihrer Richtung auf.
+
+WICHTIG: Das Bild im Mal-Programm nicht skalieren oder zuschneiden.
+
+In den Einstellungen: 6, 8 oder 10 Ansichten (8 und 10 haben
+zusätzlich Schrägansichten).
+
+Versteckte Stellen (Achseln, Beininnenseiten, unters Kinn) danach
+mit Rundum-Modus AUS gezielt nachmalen: Modell so drehen, dass man
+die Stelle sieht, Knopf drücken.
+
+
+MAL-PROGRAMM WECHSELN
+---------------------
+Ganz oben im Panel: Clip Studio Paint / Krita / PhotoCraft / Eigenes.
+
+Beim Speichern mit Strg+S:
+- CSP:        Fragt CSP nach "Ebenen zusammenführen" -> OK.
+- Krita:      Fragt evtl. nach PNG-Optionen -> OK.
+              "Transparenz speichern" muss an sein.
+- PhotoCraft: Meldet evtl., dass Ebenen beim PNG-Speichern
+              zusammengefügt werden -> OK.
+
+Krita braucht beim ersten Start ein paar Sekunden.
+
+Ein Update bei jedem Pinselzug (ohne Strg+S) geht nicht: Clip Studio
+Paint hat dafür keine Schnittstelle.
+
+
+WAS AUTOMATISCH PASSIERT (beim ersten Knopfdruck)
+-------------------------------------------------
+- Keine UVs?           -> werden automatisch angelegt (Smart UV Project)
+- Kein Material?       -> wird angelegt
+- Keine Textur?        -> leere Textur, 2048 oder 4096 px (Einstellungen)
+- Hat das Modell schon eine Textur (z. B. Tripo)? -> es wird darauf gemalt
+- Blender wechselt in den Texture-Paint-Modus
+
+
+EINSTELLUNGEN (Panel > "Einstellungen" aufklappen)
+--------------------------------------------------
+Aufnahmegröße (Ansicht)  Längste Bildseite bei einer Ansicht (Standard 2048)
+Kachelgröße (Rundum)     Längste Seite pro Kachel im Raster (Standard 1024)
+Rundum-Ansichten         6 / 8 / 10
+Neue Textur              2048 oder 4096 px
+Winkel (Ansicht)         80. Schräge Flächen über diesem Winkel
+                         werden nicht bemalt.
+Winkel (Rundum)          60. Nicht unter 55, sonst bleiben Lücken.
+Exe                      Pfad zum gewählten Mal-Programm
+
+
+WENN WAS NICHT KLAPPT
+---------------------
+"CSP nicht gefunden" / "Kein Pfad für ... eingetragen"
+    -> Pfad in den Einstellungen prüfen.
+
+"Nichts Neues gemalt"
+    -> Auf der gespeicherten Datei hat sich nichts geändert.
+
+"Das Raster hat die falsche Größe"
+    -> Leinwand im Mal-Programm wurde verändert. "Verwerfen" und neu.
+
+Graue Ränder um das Gemalte
+    -> Weicher Pinsel. Vorlage vor Strg+S ausblenden.
+
+Farbe sieht an Kanten matschig aus
+    -> Frontal auf die Stelle schauen und nochmal mit einer Ansicht malen.
+
+Großes Raster macht das Mal-Programm langsam
+    -> Kachelgröße in den Einstellungen kleiner stellen (z. B. 768).
+
+
+WO DIE BILDER LIEGEN
+--------------------
+Blender-Datei gespeichert:  neben der .blend im Ordner  <name>_texturpainter
+                            (Unterordner "templates" = Kopien der Vorlagen)
+Noch nicht gespeichert:     im Blender-Temp-Ordner (weg nach dem Schließen)
+
+Die bemalte Textur steckt in der .blend-Datei.
+Also am Ende: "Blender-Datei speichern".

@@ -1,0 +1,174 @@
+TEXTURPAINTER - paint 3D models with CSP, Krita or PhotoCraft
+=========================================================================
+
+You paint in your 2D painting program, Blender projects it onto the
+model live. You never have to touch UVs.
+
+Tested with: Clip Studio Paint, Krita, PhotoCraft
+             Blender 5.3 and 5.2
+
+
+INSTALL ONCE
+------------
+1. Blender: Edit > Preferences > Add-ons
+2. Top right, the small arrow (v) > "Install from Disk"
+3. Select the file  texturpainter.py
+4. Tick "Texturpainter"
+5. Done. In the 3D Viewport press N > tab "Texturpainter"
+
+The add-on speaks the language set in Blender
+(English or German, other languages show English).
+
+The default paths for CSP and Krita are already filled in.
+PhotoCraft or another program: expand the add-on > enter the path
+to the .exe. If a program is installed elsewhere, change the path there.
+
+
+THE PANEL
+---------
+  [ Choose painting program   ]
+  [ All-sides mode: on/off    ]
+  | Status                    |
+  [   VIEW TO CSP             ]   <- big button
+  [ Open again |  Discard     ]
+  [ Save Blender file         ]
+
+
+HOW TO PAINT
+------------
+1. Select the model.
+2. Press the big button.
+   -> Your painting program opens with an image of the view.
+      (If it is behind Blender: click it in the taskbar.)
+3. In the painting program:
+   - Create a NEW LAYER and paint on it
+   - The template may stay visible
+   - Ctrl+S, as often as you like
+   -> After every Ctrl+S the painting shows up on the model in Blender
+      by itself after about 1 second.
+4. Another side: rotate the model in Blender, press the big button.
+   -> The new view goes to the painting program.
+5. Repeat.
+6. At the end: "Save Blender file".
+   (For a new file Blender asks where to save it.)
+
+
+GOOD TO KNOW
+------------
+- Saving several times is fine. Nothing gets painted twice,
+  not even with semi-transparent brushes.
+- Erased something and pressed Ctrl+S? Then it is gone on the model too.
+- Pressed the big button without painting? No problem, it just goes on.
+- "Discard" removes everything you painted in the current view.
+- "Open again" = in case you closed the painting program.
+- Careful: whatever you paint directly in Blender on the texture while
+  a view is open in the painting program gets overwritten by the next
+  Ctrl+S there. Press "Discard" or get a new view first, then paint
+  in Blender.
+
+
+WHY THE TEMPLATE MAY STAY VISIBLE
+---------------------------------
+Blender remembers the template. When projecting, everything that still
+looks exactly like the template is ignored. Only what you newly painted
+lands on the model.
+
+Exception: semi-transparent brushes (airbrush, soft edges) blend with the
+grey of the template when saving. Then a bit of grey gets projected too.
+For such brushes, hide the template layer shortly before Ctrl+S.
+
+
+STATUS IN THE PANEL
+-------------------
+  i  "Ready"                  -> rotate the model, press the button
+  ⏱  "Paint in ... + Ctrl+S"   -> paint and save in the painting program
+  ✓  "On the model (time)"    -> it is on. Keep painting + Ctrl+S
+                                 or rotate + button
+  !  red message              -> something failed, the reason is shown
+
+
+ALL-SIDES MODE
+--------------
+Turn on "All-sides mode", then press the big button.
+You get ONE image with all sides next to each other:
+
+  top row:     front | right  | back    | left
+  bottom row:  top   | bottom | (empty) | (empty)
+
+Paint everything, Ctrl+S. Blender cuts the image apart by itself and
+projects every side from its direction.
+
+IMPORTANT: Do not scale or crop the image in the painting program.
+
+In the settings: 6, 8 or 10 views (8 and 10 add 45° views).
+
+Hidden spots (armpits, inner legs, under the chin): afterwards paint them
+with all-sides mode OFF: rotate the model so you can see the spot,
+press the button.
+
+
+SWITCHING THE PAINTING PROGRAM
+------------------------------
+At the top of the panel: Clip Studio Paint / Krita / PhotoCraft / Custom.
+
+When saving with Ctrl+S:
+- CSP:        asks to merge layers -> OK.
+- Krita:      may ask for PNG options -> OK.
+              "Store alpha channel" must be on.
+- PhotoCraft: may say that layers are merged for PNG -> OK.
+
+Krita needs a few seconds on first start.
+
+An update on every brush stroke (without Ctrl+S) is not possible:
+Clip Studio Paint has no interface for that.
+
+
+WHAT HAPPENS AUTOMATICALLY (first button press)
+-----------------------------------------------
+- No UVs?              -> created automatically (Smart UV Project)
+- No material?         -> created
+- No texture?          -> empty texture, 2048 or 4096 px (settings)
+- Model already has a texture (e.g. Tripo)? -> painting goes onto it
+- Blender switches to Texture Paint mode
+
+
+SETTINGS (panel > expand "Settings")
+------------------------------------
+Capture size (view)     Longest image side for a single view (default 2048)
+Tile size (all sides)   Longest side per tile in the grid (default 1024)
+All-sides views         6 / 8 / 10
+New texture             2048 or 4096 px
+Angle (view)            80. Faces tilted more than this are not painted.
+Angle (all sides)       60. Not below 55, otherwise gaps remain.
+Exe                     Path to the selected painting program
+
+
+TROUBLESHOOTING
+---------------
+"CSP not found" / "No path set for ..."
+    -> Check the path in the settings.
+
+"Nothing new painted"
+    -> Nothing changed in the saved file.
+
+"The grid has the wrong size"
+    -> The canvas was changed in the painting program. "Discard" and redo.
+
+Grey edges around the painting
+    -> Soft brush. Hide the template before Ctrl+S.
+
+Colour looks smeared at edges
+    -> Look straight at the spot and paint it again with a single view.
+
+Big grid makes the painting program slow
+    -> Make the tile size smaller in the settings (e.g. 768).
+
+
+WHERE THE IMAGES ARE
+--------------------
+Blender file saved:      next to the .blend in the folder  <name>_texturpainter
+                         (subfolder "templates" = copies of the templates)
+Not saved yet:           in Blender's temp folder (gone after closing)
+
+The painted texture lives inside the .blend file.
+So at the end: "Save Blender file".
