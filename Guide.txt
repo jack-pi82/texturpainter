@@ -26,18 +26,32 @@ to the .exe. If a program is installed elsewhere, change the path there.
 
 THE PANEL
 ---------
-  [ Choose painting program   ]
-  [ All-sides mode: on/off    ]
-  | Status                    |
-  [   VIEW TO CSP             ]   <- big button
-  [ Open again |  Discard     ]
-  [ Save Blender file         ]
+3D Viewport > press N > tab "Texturpainter". From top to bottom:
+
+  "Clip Studio Paint"        Dropdown: pick the painting program
+                             (Clip Studio Paint, Krita, PhotoCraft,
+                             Custom program)
+  "All-sides mode: off"      Toggle. Off = the view you see.
+  / "All-sides mode: ON"     On = all sides at once (see below)
+  Status box                 Shows what is going on
+  "View to CSP"              Big button: sends the view to the
+                             painting program
+  "New view to CSP"          Same button while a view is open:
+                             finishes it, sends the new one
+  "All sides to CSP"         Same button with all-sides mode ON
+  "Open again"               Opens the view again in the painting program
+  "Discard"                  Forgets the view and removes what you
+                             painted in it from the model
+  "Save Blender file"        Saves the .blend with the texture
+
+Instead of "CSP" the buttons show the program you picked,
+e.g. "View to Krita".
 
 
 HOW TO PAINT
 ------------
 1. Select the model.
-2. Press the big button.
+2. Press "View to CSP".
    -> Your painting program opens with an image of the view.
       (If it is behind Blender: click it in the taskbar.)
 3. In the painting program:
@@ -46,7 +60,7 @@ HOW TO PAINT
    - Ctrl+S, as often as you like
    -> After every Ctrl+S the painting shows up on the model in Blender
       by itself after about 1 second.
-4. Another side: rotate the model in Blender, press the big button.
+4. Another side: rotate the model in Blender, press "New view to CSP".
    -> The new view goes to the painting program.
 5. Repeat.
 6. At the end: "Save Blender file".
@@ -58,7 +72,7 @@ GOOD TO KNOW
 - Saving several times is fine. Nothing gets painted twice,
   not even with semi-transparent brushes.
 - Erased something and pressed Ctrl+S? Then it is gone on the model too.
-- Pressed the big button without painting? No problem, it just goes on.
+- Pressed "New view to CSP" without painting? No problem, it just goes on.
 - "Discard" removes everything you painted in the current view.
 - "Open again" = in case you closed the painting program.
 - Careful: whatever you paint directly in Blender on the texture while
@@ -80,16 +94,17 @@ For such brushes, hide the template layer shortly before Ctrl+S.
 
 STATUS IN THE PANEL
 -------------------
-  i  "Ready"                  -> rotate the model, press the button
+  i  "Ready"                  -> rotate the model, press "View to CSP"
   ⏱  "Paint in ... + Ctrl+S"   -> paint and save in the painting program
   ✓  "On the model (time)"    -> it is on. Keep painting + Ctrl+S
-                                 or rotate + button
+                                 or rotate + "New view to CSP"
   !  red message              -> something failed, the reason is shown
 
 
 ALL-SIDES MODE
 --------------
-Turn on "All-sides mode", then press the big button.
+Click "All-sides mode: off", it then shows "All-sides mode: ON".
+Then press "All sides to CSP".
 You get ONE image with all sides next to each other:
 
   top row:     front | right  | back    | left
@@ -103,8 +118,8 @@ IMPORTANT: Do not scale or crop the image in the painting program.
 In the settings: 6, 8 or 10 views (8 and 10 add 45° views).
 
 Hidden spots (armpits, inner legs, under the chin): afterwards paint them
-with all-sides mode OFF: rotate the model so you can see the spot,
-press the button.
+with "All-sides mode: off": rotate the model so you can see the spot,
+press "View to CSP".
 
 
 SWITCHING THE PAINTING PROGRAM
@@ -123,8 +138,8 @@ An update on every brush stroke (without Ctrl+S) is not possible:
 Clip Studio Paint has no interface for that.
 
 
-WHAT HAPPENS AUTOMATICALLY (first button press)
------------------------------------------------
+WHAT HAPPENS AUTOMATICALLY (first "View to CSP")
+--------------------------------------------------
 - No UVs?              -> created automatically (Smart UV Project)
 - No material?         -> created
 - No texture?          -> empty texture, 2048 or 4096 px (settings)

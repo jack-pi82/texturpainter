@@ -26,18 +26,32 @@ eintragen. Liegt ein Programm woanders: dort den Pfad ändern.
 
 DAS PANEL
 ---------
-  [ Mal-Programm wählen       ]
-  [ Rundum-Modus: an/aus      ]
-  | Status                    |
-  [   ANSICHT AN CSP          ]   <- großer Knopf
-  [ Nochmal öffnen | Verwerfen ]
-  [ Blender-Datei speichern   ]
+3D-Ansicht > N drücken > Reiter "Texturpainter". Von oben nach unten:
+
+  "Clip Studio Paint"        Auswahlliste: Mal-Programm wählen
+                             (Clip Studio Paint, Krita, PhotoCraft,
+                             Eigenes Programm)
+  "Rundum-Modus: aus"        Umschalter. Aus = die Ansicht, die du siehst.
+  / "Rundum-Modus: AN"       An = alle Seiten auf einmal (siehe unten)
+  Status-Kasten              Zeigt, was gerade los ist
+  "Ansicht an CSP"           Großer Knopf: schickt die Ansicht ans
+                             Mal-Programm
+  "Neue Ansicht an CSP"      Derselbe Knopf, solange eine Ansicht offen
+                             ist: schließt sie ab, schickt die neue
+  "Rundum an CSP"            Derselbe Knopf mit Rundum-Modus AN
+  "Nochmal öffnen"           Öffnet die Ansicht nochmal im Mal-Programm
+  "Verwerfen"                Vergisst die Ansicht, nimmt das Gemalte
+                             davon wieder vom Modell
+  "Blender-Datei speichern"  Speichert die .blend mit der Textur
+
+Statt "CSP" steht auf den Knöpfen das gewählte Programm,
+z. B. "Ansicht an Krita".
 
 
 SO MALST DU
 -----------
 1. Modell anklicken.
-2. Großen Knopf drücken.
+2. "Ansicht an CSP" drücken.
    -> Dein Mal-Programm geht mit einem Bild der Ansicht auf.
       (Liegt es hinter Blender: in der Taskleiste anklicken.)
 3. Im Mal-Programm:
@@ -46,7 +60,7 @@ SO MALST DU
    - Strg+S, so oft du willst
    -> Nach jedem Strg+S erscheint das Gemalte nach ca. 1 Sekunde
       von selbst auf dem Modell in Blender.
-4. Andere Seite: In Blender das Modell drehen, großen Knopf drücken.
+4. Andere Seite: In Blender das Modell drehen, "Neue Ansicht an CSP" drücken.
    -> Die neue Ansicht geht ans Mal-Programm.
 5. Wiederholen.
 6. Zum Schluss: "Blender-Datei speichern".
@@ -58,7 +72,7 @@ GUT ZU WISSEN
 - Mehrmals Strg+S ist kein Problem. Nichts wird doppelt aufgemalt,
   auch nicht mit halbdurchsichtigen Pinseln.
 - Etwas wegradiert und Strg+S? Dann ist es auch auf dem Modell weg.
-- Großen Knopf gedrückt, ohne zu malen? Egal, es geht einfach weiter.
+- "Neue Ansicht an CSP" gedrückt, ohne zu malen? Egal, es geht einfach weiter.
 - "Verwerfen" nimmt alles zurück, was du in der aktuellen Ansicht
   gemalt hast.
 - "Nochmal öffnen" = falls du das Mal-Programm zugemacht hast.
@@ -81,16 +95,17 @@ mit auf. Für solche Pinsel die Vorlage kurz vor Strg+S ausblenden.
 
 DER STATUS IM PANEL
 -------------------
-  i  "Bereit"                 -> Modell drehen, Knopf drücken
+  i  "Bereit"                 -> Modell drehen, "Ansicht an CSP" drücken
   ⏱  "In ... malen + Strg+S"   -> Im Mal-Programm malen und speichern
   ✓  "Auf dem Modell (Zeit)"  -> Ist drauf. Weiter malen + Strg+S
-                                 oder drehen + Knopf
+                                 oder drehen + "Neue Ansicht an CSP"
   !  rote Meldung             -> Hat nicht geklappt, Grund steht da
 
 
 RUNDUM-MODUS (alle Seiten auf einmal)
 -------------------------------------
-Knopf "Rundum-Modus" anschalten, dann den großen Knopf drücken.
+Auf "Rundum-Modus: aus" klicken, dann steht da "Rundum-Modus: AN".
+Dann "Rundum an CSP" drücken.
 Du bekommst EIN Bild mit allen Seiten nebeneinander:
 
   oben:   vorne | rechts | hinten | links
@@ -105,8 +120,8 @@ In den Einstellungen: 6, 8 oder 10 Ansichten (8 und 10 haben
 zusätzlich Schrägansichten).
 
 Versteckte Stellen (Achseln, Beininnenseiten, unters Kinn) danach
-mit Rundum-Modus AUS gezielt nachmalen: Modell so drehen, dass man
-die Stelle sieht, Knopf drücken.
+mit "Rundum-Modus: aus" gezielt nachmalen: Modell so drehen, dass man
+die Stelle sieht, "Ansicht an CSP" drücken.
 
 
 MAL-PROGRAMM WECHSELN
@@ -126,8 +141,8 @@ Ein Update bei jedem Pinselzug (ohne Strg+S) geht nicht: Clip Studio
 Paint hat dafür keine Schnittstelle.
 
 
-WAS AUTOMATISCH PASSIERT (beim ersten Knopfdruck)
--------------------------------------------------
+WAS AUTOMATISCH PASSIERT (beim ersten "Ansicht an CSP")
+-----------------------------------------------------------
 - Keine UVs?           -> werden automatisch angelegt (Smart UV Project)
 - Kein Material?       -> wird angelegt
 - Keine Textur?        -> leere Textur, 2048 oder 4096 px (Einstellungen)

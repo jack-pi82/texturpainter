@@ -15,15 +15,30 @@ Tested with Blender 5.3 and 5.2 LTS and with Clip Studio Paint, Krita and PhotoC
 
 The default paths for Clip Studio Paint and Krita are filled in. For PhotoCraft or another program, enter the path to its `.exe` in the add-on preferences.
 
+## The panel
+
+All buttons are in the 3D Viewport sidebar (N), tab **Texturpainter**. Instead of “CSP”, the buttons show the program you picked, e.g. **View to Krita**.
+
+| Button | What it does |
+| --- | --- |
+| **Clip Studio Paint** (dropdown) | Picks the painting program: Clip Studio Paint, Krita, PhotoCraft or Custom program |
+| **All-sides mode: off** / **ON** | Off: sends the view you see. On: sends all sides at once as one grid image |
+| **View to CSP** | Sends the current view to the painting program. Shown when no view is open |
+| **New view to CSP** | Same button while a view is open: finishes it and sends the new view |
+| **All sides to CSP** | Same button with all-sides mode on |
+| **Open again** | Opens the current view again, in case you closed the painting program |
+| **Discard** | Forgets the current view and removes what you painted in it |
+| **Save Blender file** | Saves the .blend with the painted texture |
+
 ## Usage
 
-1. Select the model and press the big button. The painting program opens with the current view.
+1. Select the model and press **View to CSP**. The painting program opens with the current view.
 2. In the painting program, create a new layer and paint. The template may stay visible.
 3. Press Ctrl+S as often as you like. After every save the painting appears on the model by itself after about a second.
-4. For the next side, rotate the model in Blender and press the big button again.
+4. For the next side, rotate the model in Blender and press **New view to CSP**.
 5. At the end press **Save Blender file**.
 
-**All-sides mode** sends 6, 8 or 10 views as one grid image, so one Ctrl+S covers every side.
+With **All-sides mode: ON**, the button **All sides to CSP** sends 6, 8 or 10 views as one grid image, so one Ctrl+S covers every side.
 
 The full guide with troubleshooting is in [Guide.txt](Guide.txt).
 
@@ -60,15 +75,30 @@ Getestet mit Blender 5.3 und 5.2 LTS sowie mit Clip Studio Paint, Krita und Phot
 
 Die Standardpfade zu Clip Studio Paint und Krita sind eingetragen. Für PhotoCraft oder ein anderes Programm trägst du den Pfad zur `.exe` in den Addon-Einstellungen ein.
 
+### Das Panel
+
+Alle Knöpfe sind in der 3D-Ansicht im N-Panel, Reiter **Texturpainter**. Statt „CSP“ steht auf den Knöpfen das gewählte Programm, z. B. **Ansicht an Krita**.
+
+| Knopf | Was er macht |
+| --- | --- |
+| **Clip Studio Paint** (Auswahlliste) | Wählt das Mal-Programm: Clip Studio Paint, Krita, PhotoCraft oder Eigenes Programm |
+| **Rundum-Modus: aus** / **AN** | Aus: schickt die Ansicht, die du siehst. An: schickt alle Seiten auf einmal als ein Raster-Bild |
+| **Ansicht an CSP** | Schickt die aktuelle Ansicht ans Mal-Programm. Steht da, wenn keine Ansicht offen ist |
+| **Neue Ansicht an CSP** | Derselbe Knopf, solange eine Ansicht offen ist: schließt sie ab und schickt die neue |
+| **Rundum an CSP** | Derselbe Knopf bei eingeschaltetem Rundum-Modus |
+| **Nochmal öffnen** | Öffnet die aktuelle Ansicht nochmal, falls du das Mal-Programm zugemacht hast |
+| **Verwerfen** | Vergisst die aktuelle Ansicht und entfernt, was du darin gemalt hast |
+| **Blender-Datei speichern** | Speichert die .blend mit der bemalten Textur |
+
 ### Bedienung
 
-1. Modell anklicken und den großen Knopf drücken. Das Mal-Programm öffnet sich mit der aktuellen Ansicht.
+1. Modell anklicken und **Ansicht an CSP** drücken. Das Mal-Programm öffnet sich mit der aktuellen Ansicht.
 2. Im Mal-Programm eine neue Ebene anlegen und malen. Die Vorlage darf sichtbar bleiben.
 3. Strg+S drücken, so oft du willst. Nach jedem Speichern erscheint das Gemalte nach etwa einer Sekunde von selbst auf dem Modell.
-4. Für die nächste Seite in Blender das Modell drehen und wieder den großen Knopf drücken.
+4. Für die nächste Seite in Blender das Modell drehen und **Neue Ansicht an CSP** drücken.
 5. Zum Schluss **Blender-Datei speichern** drücken.
 
-Der **Rundum-Modus** schickt 6, 8 oder 10 Ansichten als ein Raster-Bild, ein Strg+S reicht dann für alle Seiten.
+Mit **Rundum-Modus: AN** schickt der Knopf **Rundum an CSP** 6, 8 oder 10 Ansichten als ein Raster-Bild, ein Strg+S reicht dann für alle Seiten.
 
 Die ausführliche Anleitung mit Fehlerhilfe steht in [Anleitung.txt](Anleitung.txt).
 
