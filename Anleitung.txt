@@ -19,9 +19,11 @@ EINMAL INSTALLIEREN
 Das Addon spricht die Sprache, die in Blender eingestellt ist
 (Deutsch oder Englisch, andere Sprachen zeigen Englisch).
 
-Die Standard-Pfade zu CSP und Krita sind schon eingetragen.
-PhotoCraft oder ein anderes Programm: Add-on aufklappen > Pfad zur .exe
-eintragen. Liegt ein Programm woanders: dort den Pfad ändern.
+Clip Studio Paint, Krita und PhotoCraft werden automatisch gefunden.
+In den Einstellungen steht unter jedem Pfadfeld "Automatisch gefunden: ...".
+Nur wenn dort "Nicht gefunden" steht, den Pfad zur .exe selbst eintragen.
+Ein selbst eingetragener Pfad hat immer Vorrang. Feld leeren = wieder
+automatisch suchen. Für "Eigenes Programm" den Pfad immer selbst eintragen.
 
 
 TIPP VORWEG: ERST DIE BLENDER-DATEI SPEICHERN
@@ -193,8 +195,10 @@ Pinsel malt nicht
     -> Ist die Ebene "malen" angeklickt (nicht der Ordner)?
        Ist der Ordner sichtbar (Auge an)?
 
-"CSP nicht gefunden" / "Kein Pfad für ... eingetragen"
-    -> Pfad in den Einstellungen prüfen.
+"... wurde nicht automatisch gefunden" / "... nicht gefunden: <Pfad>"
+    -> Programm installieren oder in den Einstellungen den Pfad zur .exe
+       eintragen. Steht dort ein falscher Pfad: Feld leeren, dann sucht
+       das Addon selbst.
 
 "Nichts Neues gemalt"
     -> Auf der gespeicherten Datei hat sich nichts geändert.

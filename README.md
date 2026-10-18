@@ -13,7 +13,7 @@ Tested with Blender 5.3 and 5.2 LTS and with Clip Studio Paint, Krita and PhotoC
 3. Select `texturpainter.py` and tick “Texturpainter”
 4. In the 3D Viewport press N → tab **Texturpainter**
 
-The default paths for Clip Studio Paint and Krita are filled in. For PhotoCraft or another program, enter the path to its `.exe` in the add-on preferences.
+Clip Studio Paint, Krita and PhotoCraft are found automatically (Windows registry and the usual install folders). The preferences show what was found under each path field. Only if a program is not found, enter the path to its `.exe`; a path you enter always wins.
 
 ## The panel
 
@@ -76,7 +76,7 @@ Getestet mit Blender 5.3 und 5.2 LTS sowie mit Clip Studio Paint, Krita und Phot
 3. `texturpainter.py` auswählen und den Haken bei „Texturpainter“ setzen
 4. In der 3D-Ansicht N drücken → Reiter **Texturpainter**
 
-Die Standardpfade zu Clip Studio Paint und Krita sind eingetragen. Für PhotoCraft oder ein anderes Programm trägst du den Pfad zur `.exe` in den Addon-Einstellungen ein.
+Clip Studio Paint, Krita und PhotoCraft werden automatisch gefunden (Windows-Registry und die üblichen Installationsordner). Unter jedem Pfadfeld in den Einstellungen steht, was gefunden wurde. Nur wenn ein Programm nicht gefunden wird, den Pfad zur `.exe` eintragen; ein eingetragener Pfad hat immer Vorrang.
 
 ### Das Panel
 

@@ -4,13 +4,14 @@
 bl_info = {
     "name": "Texturpainter - paint 3D models in your 2D painting app",
     "author": "jack-pi82",
-    "version": (1, 3, 1),
+    "version": (1, 4, 0),
     "blender": (4, 2, 0),
     "location": "3D Viewport > Sidebar (N) > Texturpainter",
     "description": "Send the view to CSP/Krita/PhotoCraft, paint there, projected back onto the model live",
     "category": "Paint",
 }
 
+import glob
 import math
 import os
 import re
@@ -106,16 +107,16 @@ class TEXTURPAINTER_Preferences(bpy.types.AddonPreferences):
 
     painter: EnumProperty(name="Painting program", items=PAINTERS, default="CSP")
     path_csp: StringProperty(
-        name="Clip Studio Paint", subtype="FILE_PATH",
-        default=r"C:\Program Files\CELSYS\CLIP STUDIO 1.5\CLIP STUDIO PAINT\CLIPStudioPaint.exe",
+        name="Clip Studio Paint", subtype="FILE_PATH", default="",
+        description="Leave empty to find the program automatically",
     )
     path_krita: StringProperty(
-        name="Krita", subtype="FILE_PATH",
-        default=r"C:\Program Files\Krita (x64)\bin\krita.exe",
+        name="Krita", subtype="FILE_PATH", default="",
+        description="Leave empty to find the program automatically",
     )
     path_photocraft: StringProperty(
-        name="PhotoCraft", subtype="FILE_PATH",
-        default="",
+        name="PhotoCraft", subtype="FILE_PATH", default="",
+        description="Leave empty to find the program automatically",
     )
     path_custom: StringProperty(name="Custom program", subtype="FILE_PATH", default="")
 
@@ -156,10 +157,8 @@ class TEXTURPAINTER_Preferences(bpy.types.AddonPreferences):
         layout.prop(self, "painter")
         box = layout.box()
         box.label(text="Program paths (.exe)")
-        box.prop(self, "path_csp")
-        box.prop(self, "path_krita")
-        box.prop(self, "path_photocraft")
-        box.prop(self, "path_custom")
+        for key in ("CSP", "KRITA", "PHOTOCRAFT", "CUSTOM"):
+            draw_path(box, self, key)
         box = layout.box()
         box.label(text="Sizes")
         box.prop(self, "grab_size")
@@ -204,17 +203,135 @@ def painter_name(prefs):
     return iface_(PAINTER_NAMES.get(prefs.painter, "Painting program"))
 
 
+# Wo die Mal-Programme typischerweise stecken. {pf} = Program Files, {pf86} = Program Files (x86),
+# {local} = AppData\Local. Gesucht wird auch in der Windows-Registry.
+PAINTER_SEARCH = {
+    "CSP": {
+        "exe": "CLIPStudioPaint.exe",
+        "names": ("clip studio paint",),
+        "progids": ("clipstudiopaint",),
+        "globs": (r"{pf}\CELSYS\*\CLIP STUDIO PAINT\CLIPStudioPaint.exe",
+                  r"{pf86}\CELSYS\*\CLIP STUDIO PAINT\CLIPStudioPaint.exe"),
+    },
+    "KRITA": {
+        "exe": "krita.exe",
+        "names": ("krita",),
+        "progids": ("Krita.Document", "Krita.OpenRaster"),
+        "globs": (r"{pf}\Krita*\bin\krita.exe", r"{local}\Programs\Krita*\bin\krita.exe"),
+    },
+    "PHOTOCRAFT": {
+        "exe": "photocraft.exe",
+        "names": ("photocraft",),
+        "progids": ("Photocraft.Document", "Photocraft.Image"),
+        "globs": (r"{pf}\PhotoCraft*\photocraft.exe", r"{local}\Programs\PhotoCraft*\photocraft.exe",
+                  r"{local}\PhotoCraft*\photocraft.exe"),
+    },
+}
+_FOUND = {}
+
+
+def _registry_candidates(info):
+    """Pfade aus App Paths, 'Programme und Features' und Dateizuordnungen."""
+    try:
+        import winreg
+    except ImportError:
+        return []
+    out = []
+    roots = (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE)
+
+    def value(root, sub, name=""):
+        try:
+            with winreg.OpenKey(root, sub) as key:
+                return str(winreg.QueryValueEx(key, name)[0])
+        except OSError:
+            return ""
+
+    for root in roots:
+        out.append(value(root, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths" + "\\" + info["exe"]))
+        for progid in info["progids"]:
+            command = value(root, rf"SOFTWARE\Classes\{progid}\shell\open\command")
+            match = re.match(r'\s*"([^"]+)"|\s*(\S+)', command)
+            if match:
+                out.append(match.group(1) or match.group(2))
+
+    for root, sub in ((winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+                      (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+                      (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall")):
+        try:
+            with winreg.OpenKey(root, sub) as key:
+                count = winreg.QueryInfoKey(key)[0]
+                for i in range(count):
+                    entry = sub + "\\" + winreg.EnumKey(key, i)
+                    name = value(root, entry, "DisplayName").lower()
+                    if not any(n in name for n in info["names"]):
+                        continue
+                    icon = value(root, entry, "DisplayIcon").split(",")[0].strip('"')
+                    out.append(icon)
+                    location = value(root, entry, "InstallLocation").strip('"')
+                    if location:
+                        for depth in ("", "*", "bin", os.path.join("*", "*")):
+                            out.extend(glob.glob(os.path.join(location, depth, info["exe"])))
+        except OSError:
+            continue
+    return out
+
+
+def find_painter(key):
+    """Mal-Programm automatisch finden. Ergebnis wird für die Sitzung gemerkt."""
+    if key in _FOUND and (not _FOUND[key] or os.path.isfile(_FOUND[key])):
+        return _FOUND[key]
+    info = PAINTER_SEARCH.get(key)
+    found = ""
+    if info:
+        env = {
+            "pf": os.environ.get("ProgramFiles", r"C:\Program Files"),
+            "pf86": os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+            "local": os.environ.get("LOCALAPPDATA", ""),
+        }
+        candidates = _registry_candidates(info)
+        for pattern in info["globs"]:
+            candidates.extend(sorted(glob.glob(pattern.format(**env)), reverse=True))
+        for path in candidates:
+            if path and os.path.basename(path).lower() == info["exe"].lower() and os.path.isfile(path):
+                found = os.path.normpath(path)
+                break
+    _FOUND[key] = found
+    return found
+
+
+def configured_path(prefs, key):
+    raw = getattr(prefs, PAINTER_PATH_PROP[key], "")
+    return bpy.path.abspath(raw.strip().strip('"')) if raw.strip() else ""
+
+
+def draw_path(layout, prefs, key, text=None):
+    """Pfadfeld; ist es leer, steht darunter, was automatisch gefunden wurde."""
+    if text is None:
+        layout.prop(prefs, PAINTER_PATH_PROP[key])
+    else:
+        layout.prop(prefs, PAINTER_PATH_PROP[key], text=text)
+    if key == "CUSTOM" or configured_path(prefs, key):
+        return
+    found = find_painter(key)
+    if found:
+        layout.label(text=iface_("Found automatically: {}").format(found), icon="CHECKMARK", translate=False)
+    else:
+        layout.label(text="Not found - please enter the path", icon="ERROR")
+
+
 def painter_exe(prefs):
     name = painter_name(prefs)
-    raw = getattr(prefs, PAINTER_PATH_PROP[prefs.painter], "")
-    path = bpy.path.abspath(raw.strip().strip('"'))
-    if not path:
-        raise CSPError(rpt_("No path set for {}. Please enter it in the add-on preferences.").format(name))
-    if not os.path.isfile(path):
-        short = "CSP" if prefs.painter == "CSP" else name
-        raise CSPError(rpt_("{} not found: {} - please check the path in the add-on preferences.")
-                       .format(short, path))
-    return path
+    path = configured_path(prefs, prefs.painter)
+    if path:
+        if not os.path.isfile(path):
+            short = "CSP" if prefs.painter == "CSP" else name
+            raise CSPError(rpt_("{} not found: {} - please check the path in the add-on preferences.")
+                           .format(short, path))
+        return path
+    found = find_painter(prefs.painter)
+    if not found:
+        raise CSPError(rpt_("{} was not found automatically. Please install it or enter the path in the add-on preferences.").format(name))
+    return found
 
 
 def open_in_painter(prefs, path):
@@ -1417,7 +1534,7 @@ class TEXTURPAINTER_PT_settings(bpy.types.Panel):
         col.prop(prefs, "texture_size", text="New texture")
         col.prop(prefs, "normal_angle")
         col.prop(prefs, "grid_normal_angle")
-        col.prop(prefs, PAINTER_PATH_PROP[prefs.painter], text="Exe")
+        draw_path(col, prefs, prefs.painter, text="Exe")
 
 
 def live_update(window, scene):
@@ -1562,8 +1679,12 @@ GERMAN = {
     "Forgets the current capture and removes what was already projected from it":
         "Vergisst die aktuelle Aufnahme und entfernt, was davon schon aufgeklebt wurde",
     # Meldungen
-    "No path set for {}. Please enter it in the add-on preferences.":
-        "Kein Pfad für {} eingetragen. Bitte in den Addon-Einstellungen eintragen.",
+    "{} was not found automatically. Please install it or enter the path in the add-on preferences.":
+        "{} wurde nicht automatisch gefunden. Bitte installieren oder den Pfad in den "
+        "Addon-Einstellungen eintragen.",
+    "Leave empty to find the program automatically": "Leer lassen, dann sucht das Addon das Programm selbst",
+    "Found automatically: {}": "Automatisch gefunden: {}",
+    "Not found - please enter the path": "Nicht gefunden - bitte Pfad eintragen",
     "{} not found: {} - please check the path in the add-on preferences.":
         "{} nicht gefunden: {} - bitte Pfad in den Addon-Einstellungen prüfen.",
     "Could not start {}: {}": "{} ließ sich nicht starten: {}",

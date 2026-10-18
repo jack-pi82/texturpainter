@@ -19,9 +19,11 @@ INSTALL ONCE
 The add-on speaks the language set in Blender
 (English or German, other languages show English).
 
-The default paths for CSP and Krita are already filled in.
-PhotoCraft or another program: expand the add-on > enter the path
-to the .exe. If a program is installed elsewhere, change the path there.
+Clip Studio Paint, Krita and PhotoCraft are found automatically.
+In the settings, each path field shows "Found automatically: ...".
+Only if it says "Not found", enter the path to the .exe yourself.
+A path you enter always wins. Empty the field = search automatically
+again. For "Custom program" always enter the path yourself.
 
 
 TIP FIRST: SAVE THE BLENDER FILE
@@ -191,8 +193,10 @@ The brush does not paint
     -> Is the "paint" layer selected (not the folder)?
        Is the folder visible (eye on)?
 
-"CSP not found" / "No path set for ..."
-    -> Check the path in the settings.
+"... was not found automatically" / "... not found: <path>"
+    -> Install the program or enter the path to the .exe in the settings.
+       If a wrong path is entered: empty the field, then the add-on
+       searches by itself.
 
 "Nothing new painted"
     -> Nothing changed in the saved file.
